@@ -1,0 +1,540 @@
+"""
+FastAPI dashboard for career-ops: KB, JD scoring, CV tailor prompts, scraping, applications.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+import uuid
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional
+
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from pypdf import PdfReader
+
+from app.services.agent_bus import TaskRecord, TaskStatus
+from app.services.ats_worker import AtsScoringWorker
+from app.services.cv_tailor_worker import CvTailorWorker
+from app.services.llm_provider import TailorLLMProvider
+from app.services.monitor_agent import MonitorAgent
+from app.services.pdf_export import markdown_to_pdf
+from app.services.scraper_worker import ScraperWorker
+from app.services import storage
+from docx import Document
+
+# Templates live next to this package under app/templates/
+_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+
+# Uploaded files land under data/uploads/
+_UPLOAD_DIR = storage.DATA_DIR / "uploads"
+
+# Repository root (parent of ``app/``) for optional ``.env``.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_dotenv_file(path: Path) -> None:
+    """
+    Load ``KEY=value`` lines from ``path`` into ``os.environ`` when the key is unset.
+
+    Supports ``#`` comments and blank lines. Strips optional single/double quotes
+    around values. Does not implement full dotenv escaping rules.
+    """
+    if not path.is_file():
+        return
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "=" not in stripped:
+            continue
+        key, _, rest = stripped.partition("=")
+        key = key.strip()
+        if not key or key.startswith("#"):
+            continue
+        val = rest.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+        if key not in os.environ:
+            os.environ[key] = val
+
+
+def wait_for_task_terminal(
+    monitor: MonitorAgent,
+    task_id: str,
+    timeout_s: float,
+    poll_s: float = 0.05,
+) -> tuple[Literal["completed", "failed", "timeout"], Optional[TaskRecord]]:
+    """
+    Poll the monitor's internal task registry until the task finishes or time runs out.
+
+    Returns:
+        A status label and the ``TaskRecord`` when completed/failed, or ``None`` on timeout
+        (record may still be running/queued).
+    """
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        with monitor._lock:
+            rec = monitor._tasks.get(task_id)
+            if rec is not None and rec.status in (
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+            ):
+                return rec.status.value, rec  # type: ignore[return-value]
+        time.sleep(poll_s)
+    return "timeout", None
+
+
+def extract_text_from_bytes(filename: str, data: bytes) -> str:
+    """
+    Extract plain text from upload bytes based on file extension.
+
+    Supports ``.docx`` (python-docx), ``.pdf`` (pypdf), and ``.txt`` / ``.md`` as UTF-8 text.
+    """
+    from io import BytesIO
+
+    lower = filename.lower()
+    buf = BytesIO(data)
+    if lower.endswith(".docx"):
+        doc = Document(buf)
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    if lower.endswith(".pdf"):
+        reader = PdfReader(buf)
+        parts: List[str] = []
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                parts.append(t)
+        return "\n".join(parts)
+    if lower.endswith(".txt") or lower.endswith(".md"):
+        return data.decode("utf-8", errors="replace")
+    raise ValueError(f"unsupported extension for {filename!r}")
+
+
+def upsert_job_listing(listing: Dict[str, Any]) -> Optional[Literal["inserted", "updated"]]:
+    """
+    Persist one scraped listing: insert new row or update existing row by unique ``link``.
+
+    Returns:
+        ``\"inserted\"``, ``\"updated\"``, or ``None`` if ``link`` is missing.
+    """
+    link = (listing.get("link") or "").strip()
+    if not link:
+        return None
+    company = str(listing.get("company") or "")
+    role = str(listing.get("role") or "Unknown role")
+    salary_text = listing.get("salary_text")
+    location = listing.get("location")
+    source = listing.get("source")
+    jd_text = listing.get("jd_text")
+    existing = storage.job_get_by_link(link)
+    if existing:
+        storage.job_update(
+            int(existing["id"]),
+            company=company or None,
+            role=role,
+            link=link,
+            salary_text=salary_text,
+            location=location,
+            source=source,
+            jd_text=jd_text,
+        )
+        return "updated"
+    storage.job_insert(
+        company=company or "Unknown",
+        role=role,
+        link=link,
+        salary_text=salary_text,
+        location=location,
+        source=source,
+        jd_text=jd_text,
+        status="scraped",
+    )
+    return "inserted"
+
+
+def kb_highlights_latest(limit: int = 10) -> List[str]:
+    """Return ``content`` strings from the newest KB rows (newest first)."""
+    rows = storage.kb_list(limit=limit, offset=0)
+    return [str(r["content"]) for r in rows]
+
+
+def dedupe_kb_highlights(highlights: List[str]) -> List[str]:
+    """
+    Drop duplicate KB snippets by exact match after whitespace normalization.
+
+    Comparison key: casefolded single-spaced string. Preserves first-seen order.
+    """
+    seen: set[str] = set()
+    out: List[str] = []
+    for h in highlights:
+        s = str(h).strip()
+        if not s:
+            continue
+        key = " ".join(s.split()).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(s)
+    return out
+
+
+def latest_master_cv_text() -> Optional[str]:
+    """
+    Return the best candidate master CV text from KB uploads.
+
+    Preference order:
+    1) Latest upload whose source filename contains ``master`` and ``cv``.
+    2) Latest upload entry.
+    """
+    rows = storage.kb_list(limit=300, offset=0)
+    uploads = [r for r in rows if str(r.get("entry_type") or "") == "upload"]
+    if not uploads:
+        return None
+
+    for row in uploads:
+        src = str(row.get("source_file") or "").lower()
+        if "master" in src and "cv" in src:
+            text = str(row.get("content") or "").strip()
+            if text:
+                return text
+
+    fallback = str(uploads[0].get("content") or "").strip()
+    return fallback or None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize DB, workers, monitor, and optional LLM provider; tear down on exit."""
+    load_dotenv_file(_PROJECT_ROOT / ".env")
+    storage.init_db()
+    _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    monitor = MonitorAgent()
+    monitor.register_worker(ScraperWorker())
+    monitor.register_worker(AtsScoringWorker())
+    monitor.register_worker(CvTailorWorker())
+    monitor.start()
+    app.state.monitor = monitor
+    app.state.tailor_llm = TailorLLMProvider()
+
+    yield
+
+    monitor.stop(timeout=8.0)
+
+
+app = FastAPI(title="Career Ops", lifespan=lifespan)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request) -> Any:
+    """Render the HTML dashboard with recent jobs, applications, and monitor snapshot."""
+    monitor: MonitorAgent = request.app.state.monitor
+    jobs = storage.job_list(limit=30)
+    applications = storage.application_list(limit=30)
+    master_cv_prefill = latest_master_cv_text() or ""
+    snap = monitor.snapshot()
+    snap_json = json.dumps(snap, indent=2, sort_keys=True)
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "jobs": jobs,
+            "applications": applications,
+            "master_cv_prefill": master_cv_prefill,
+            "monitor_json": snap_json,
+        },
+    )
+
+
+@app.post("/api/kb/add-text")
+async def api_kb_add_text(
+    content: str = Form(...),
+    entry_type: str = Form("note"),
+) -> JSONResponse:
+    """Store a KB row from form fields ``content`` and optional ``entry_type``."""
+    entry_id = storage.kb_insert(entry_type=entry_type or "note", content=content)
+    return JSONResponse({"ok": True, "id": entry_id})
+
+
+@app.post("/api/kb/upload")
+async def api_kb_upload(file: UploadFile = File(...)) -> JSONResponse:
+    """
+    Save multipart upload under ``data/uploads`` and append extracted text as a KB entry.
+    """
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="empty file")
+
+    safe_name = Path(file.filename or "upload").name
+    uid = uuid.uuid4().hex
+    dest = _UPLOAD_DIR / f"{uid}_{safe_name}"
+    dest.write_bytes(raw)
+
+    try:
+        text = extract_text_from_bytes(safe_name, raw).strip()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not text:
+        text = f"(no text extracted from {safe_name})"
+
+    entry_id = storage.kb_insert(
+        entry_type="upload",
+        content=text,
+        source_file=str(dest.relative_to(storage.DATA_DIR)),
+    )
+    return JSONResponse(
+        {"ok": True, "id": entry_id, "stored_path": str(dest), "chars": len(text)}
+    )
+
+
+@app.post("/api/jobs/score")
+async def api_jobs_score(
+    request: Request, payload: Dict[str, Any] = Body(...)
+) -> JSONResponse:
+    """Enqueue ``score_jd`` and block up to 8s for the scoring result."""
+    monitor: MonitorAgent = request.app.state.monitor
+    jd_text = payload.get("jd_text")
+    if jd_text is None:
+        raise HTTPException(status_code=400, detail="jd_text required")
+    target_roles = payload.get("target_roles") or []
+    if not isinstance(target_roles, list):
+        target_roles = [str(target_roles)]
+    required_salary_gbp = payload.get("required_salary_gbp", 60000)
+
+    task_id = monitor.enqueue(
+        {
+            "type": "score_jd",
+            "payload": {
+                "jd_text": jd_text,
+                "target_roles": target_roles,
+                "required_salary_gbp": required_salary_gbp,
+            },
+        }
+    )
+    status, rec = wait_for_task_terminal(monitor, task_id, 8.0)
+    if status == "timeout":
+        return JSONResponse(
+            {"ok": False, "task_id": task_id, "timed_out": True},
+            status_code=504,
+        )
+    assert rec is not None
+    if rec.status == TaskStatus.FAILED:
+        return JSONResponse(
+            {"ok": False, "task_id": task_id, "error": rec.error},
+            status_code=500,
+        )
+    return JSONResponse({"ok": True, "task_id": task_id, "result": rec.result})
+
+
+@app.post("/api/jobs/tailor-prompt")
+async def api_jobs_tailor_prompt(
+    request: Request, payload: Dict[str, Any] = Body(...)
+) -> JSONResponse:
+    """
+    Load latest KB snippets, enqueue ``tailor_cv_prompt``, wait up to 8s, return prompt data.
+    """
+    monitor: MonitorAgent = request.app.state.monitor
+    jd_text = payload.get("jd_text")
+    master_cv = payload.get("master_cv_markdown")
+    if jd_text is None:
+        raise HTTPException(status_code=400, detail="jd_text required")
+    if not isinstance(master_cv, str) or not master_cv.strip():
+        master_cv = latest_master_cv_text()
+    if not isinstance(master_cv, str) or not master_cv.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="No master CV found. Upload your master CV first in 'Upload KB file'.",
+        )
+
+    highlights_raw = kb_highlights_latest(10)
+    highlights = dedupe_kb_highlights(highlights_raw)
+    task_id = monitor.enqueue(
+        {
+            "type": "tailor_cv_prompt",
+            "payload": {
+                "jd_text": jd_text,
+                "master_cv_markdown": master_cv,
+                "kb_highlights": highlights,
+            },
+        }
+    )
+    status, rec = wait_for_task_terminal(monitor, task_id, 8.0)
+    if status == "timeout":
+        return JSONResponse(
+            {"ok": False, "task_id": task_id, "timed_out": True},
+            status_code=504,
+        )
+    assert rec is not None
+    if rec.status == TaskStatus.FAILED:
+        return JSONResponse(
+            {"ok": False, "task_id": task_id, "error": rec.error},
+            status_code=500,
+        )
+    result: Dict[str, Any] = dict(rec.result or {})
+    tailored_cv = str(result.get("tailored_cv_markdown", "") or "")
+    tailored_cover = str(result.get("tailored_cover_markdown", "") or "")
+
+    tailor_llm: TailorLLMProvider = request.app.state.tailor_llm
+    if tailor_llm.is_enabled():
+        try:
+            llm_out = tailor_llm.generate(
+                str(jd_text),
+                str(master_cv).strip(),
+                highlights,
+            )
+            tailored_cv = llm_out["tailored_cv_markdown"]
+            tailored_cover = llm_out["tailored_cover_markdown"]
+            result["tailored_cv_markdown"] = tailored_cv
+            result["tailored_cover_markdown"] = tailored_cover
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "task_id": task_id,
+                    "kb_entries_used": len(highlights_raw),
+                    "kb_entries_after_dedup": len(highlights),
+                    "tailored_cv_markdown": tailored_cv,
+                    "tailored_cover_markdown": tailored_cover,
+                    "result": result,
+                    "provider_used": llm_out["provider"],
+                    "provider_model": llm_out["model"],
+                    "provider_fallback": False,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001 — surface concise error to client
+            err_msg = str(exc).strip() or type(exc).__name__
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "task_id": task_id,
+                    "kb_entries_used": len(highlights_raw),
+                    "kb_entries_after_dedup": len(highlights),
+                    "tailored_cv_markdown": tailored_cv,
+                    "tailored_cover_markdown": tailored_cover,
+                    "result": result,
+                    "provider_used": "local-deterministic",
+                    "provider_fallback": True,
+                    "provider_error": err_msg,
+                }
+            )
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "task_id": task_id,
+            "kb_entries_used": len(highlights_raw),
+            "kb_entries_after_dedup": len(highlights),
+            "tailored_cv_markdown": tailored_cv,
+            "tailored_cover_markdown": tailored_cover,
+            "result": result,
+        }
+    )
+
+
+@app.post("/api/scrape/run")
+async def api_scrape_run(
+    request: Request, payload: Dict[str, Any] = Body(...)
+) -> JSONResponse:
+    """Enqueue ``scrape_jobs``, wait up to 25s, upsert scraped rows, return counts."""
+    monitor: MonitorAgent = request.app.state.monitor
+    urls = payload.get("urls") or []
+    if not isinstance(urls, list):
+        raise HTTPException(status_code=400, detail="urls must be a list")
+    min_salary_gbp = payload.get("min_salary_gbp", 60000)
+
+    task_id = monitor.enqueue(
+        {
+            "type": "scrape_jobs",
+            "payload": {"urls": urls, "min_salary_gbp": min_salary_gbp},
+        }
+    )
+    status, rec = wait_for_task_terminal(monitor, task_id, 25.0)
+    if status == "timeout":
+        return JSONResponse(
+            {"ok": False, "task_id": task_id, "timed_out": True},
+            status_code=504,
+        )
+    assert rec is not None
+    if rec.status == TaskStatus.FAILED:
+        return JSONResponse(
+            {"ok": False, "task_id": task_id, "error": rec.error},
+            status_code=500,
+        )
+
+    result = rec.result or {}
+    listings = result.get("listings") or []
+    inserted = updated = skipped = 0
+    if isinstance(listings, list):
+        for item in listings:
+            if not isinstance(item, dict):
+                skipped += 1
+                continue
+            op = upsert_job_listing(item)
+            if op == "inserted":
+                inserted += 1
+            elif op == "updated":
+                updated += 1
+            else:
+                skipped += 1
+
+    return JSONResponse(
+        {
+            "ok": bool(result.get("ok", True)),
+            "task_id": task_id,
+            "inserted": inserted,
+            "updated": updated,
+            "skipped": skipped,
+            "worker_result": result,
+        }
+    )
+
+
+@app.post("/api/applications/add")
+async def api_applications_add(payload: Dict[str, Any] = Body(...)) -> JSONResponse:
+    """Insert an application row from JSON body fields."""
+    required = ("company", "role", "link", "date_applied")
+    for key in required:
+        if key not in payload:
+            raise HTTPException(status_code=400, detail=f"missing {key}")
+    app_id = storage.application_insert(
+        company=str(payload["company"]),
+        role=str(payload["role"]),
+        link=str(payload["link"]),
+        date_applied=str(payload["date_applied"]),
+        status=payload.get("status"),
+        cv_version=payload.get("cv_version"),
+        cover_version=payload.get("cover_version"),
+        notes=payload.get("notes"),
+    )
+    return JSONResponse({"ok": True, "id": app_id})
+
+
+@app.post("/api/cv/export-pdf")
+async def api_cv_export_pdf(payload: Dict[str, Any] = Body(...)) -> JSONResponse:
+    """Export markdown/plain text to a local PDF in ``output/resumes``."""
+    markdown_text = payload.get("markdown_text")
+    output_name = payload.get("output_name")
+    if not isinstance(markdown_text, str) or not markdown_text.strip():
+        raise HTTPException(status_code=400, detail="markdown_text required")
+    try:
+        out_path = markdown_to_pdf(markdown_text, output_name=output_name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return JSONResponse({"ok": True, "path": str(out_path)})
+
+
+@app.get("/api/monitor")
+async def api_monitor(request: Request) -> JSONResponse:
+    """Return the current monitor queue/worker snapshot."""
+    monitor: MonitorAgent = request.app.state.monitor
+    return JSONResponse(monitor.snapshot())

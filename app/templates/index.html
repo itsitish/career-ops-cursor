@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Career Ops</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.25rem; max-width: 1200px; color: #1a1a1a; }
+    h1 { font-size: 1.35rem; }
+    .page-section {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .page-section:last-of-type { border-bottom: none; }
+    .page-section > h2 {
+      font-size: 1.15rem;
+      margin: 0 0 0.35rem 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .section-help {
+      color: #555;
+      font-size: 0.88rem;
+      margin: 0 0 1rem 0;
+      max-width: 48rem;
+      line-height: 1.45;
+    }
+    h3 { font-size: 1rem; margin: 0 0 0.5rem 0; }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      background: #fafafa;
+    }
+    section.card { margin-bottom: 0; }
+    label { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%;
+      max-width: 42rem;
+      box-sizing: border-box;
+      padding: 0.35rem;
+      margin-top: 0.15rem;
+    }
+    textarea { min-height: 5rem; font-family: inherit; }
+    button { margin-top: 0.5rem; padding: 0.35rem 0.75rem; cursor: pointer; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin-top: 0.5rem; }
+    th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; }
+    pre.snapshot { background: #f8f8f8; border: 1px solid #ddd; padding: 0.75rem; overflow: auto; font-size: 0.78rem; max-height: 18rem; }
+    pre.api-out { background: #1e1e1e; color: #e0e0e0; padding: 0.75rem; overflow: auto; font-size: 0.78rem; max-height: 14rem; }
+    /* Large readable area for tailor prompt markdown as plain text. */
+    pre.tailor-out {
+      background: #fffef8;
+      border: 1px solid #d4c4a8;
+      padding: 1rem;
+      overflow: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 28rem;
+      margin-top: 0.5rem;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; }
+    .muted { color: #666; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>Career Ops dashboard</h1>
+  <p class="muted">Forms call JSON APIs; full JSON appears in the API response panel under Operations.</p>
+
+  <!-- 1) Knowledge Base -->
+  <div class="page-section" id="section-knowledge-base">
+    <h2>Knowledge Base</h2>
+    <p class="section-help">Capture notes and files so scoring and tailoring can reuse your context.</p>
+    <div class="grid">
+      <section class="card">
+        <h3>Add KB text</h3>
+        <form id="form-kb-text">
+          <label>Content <textarea name="content" required></textarea></label>
+          <label>Entry type <input type="text" name="entry_type" value="note" /></label>
+          <button type="submit">POST /api/kb/add-text</button>
+        </form>
+      </section>
+      <section class="card">
+        <h3>Upload KB file</h3>
+        <form id="form-kb-upload">
+          <label>File (.docx, .pdf, .txt, .md) <input type="file" name="file" required /></label>
+          <button type="submit">POST /api/kb/upload</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- 2) Job Description Analysis -->
+  <div class="page-section" id="section-job-analysis">
+    <h2>Job Description Analysis</h2>
+    <p class="section-help">Score a role against your targets, then generate a paste-ready tailor prompt from the JD and your master CV.</p>
+    <div class="grid">
+      <section class="card">
+        <h3>Score JD</h3>
+        <form id="form-score">
+          <label>JD text <textarea name="jd_text" required></textarea></label>
+          <label>Target roles (comma or newline separated) <textarea name="target_roles"></textarea></label>
+          <label>Required salary (GBP) <input type="number" name="required_salary_gbp" value="60000" /></label>
+          <button type="submit">POST /api/jobs/score</button>
+        </form>
+      </section>
+      <section class="card">
+        <h3>Tailor prompt</h3>
+        <form id="form-tailor">
+          <label>JD text <textarea name="jd_text" required></textarea></label>
+          <label>Master CV (optional override; auto-loaded from uploaded master CV if empty)
+            <textarea name="master_cv_markdown" placeholder="Leave empty to use uploaded master CV">{{ master_cv_prefill }}</textarea>
+          </label>
+          <button type="submit">POST /api/jobs/tailor-prompt</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- 3) CV & Cover Output -->
+  <div class="page-section" id="section-cv-cover">
+    <h2>CV &amp; Cover Output</h2>
+    <p class="section-help">After running Tailor prompt, generated markdown CV and cover letter appear here. Export the CV markdown to PDF when ready.</p>
+    <p class="muted" id="tailor-meta" style="margin: 0.35rem 0 0.5rem 0;"></p>
+    <p class="section-help"><strong>Tailored CV (Markdown)</strong></p>
+    <pre class="tailor-out" id="tailor-cv-out">Run “Tailor prompt” above to populate this panel.</pre>
+    <p class="section-help" style="margin-top:0.8rem;"><strong>Tailored Cover Letter (Markdown)</strong></p>
+    <pre class="tailor-out" id="tailor-cover-out">Run “Tailor prompt” above to populate this panel.</pre>
+    <div class="grid" style="margin-top: 1rem;">
+      <section class="card">
+        <h3>Export PDF</h3>
+        <form id="form-pdf">
+          <label>Markdown text <textarea name="markdown_text" required></textarea></label>
+          <label>Output filename (optional) <input type="text" name="output_name" placeholder="my-cv.pdf" /></label>
+          <button type="submit">POST /api/cv/export-pdf</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- 4) Applications Tracker -->
+  <div class="page-section" id="section-applications">
+    <h2>Applications Tracker</h2>
+    <p class="section-help">Log applications and review recent scraped jobs from the database.</p>
+    <section class="card" style="margin-bottom: 1rem;">
+      <h3>Add application</h3>
+      <form id="form-app">
+        <label>Company <input type="text" name="company" required /></label>
+        <label>Role <input type="text" name="role" required /></label>
+        <label>Link <input type="text" name="link" required /></label>
+        <label>Date applied <input type="text" name="date_applied" required placeholder="2026-04-09" /></label>
+        <label>Status <input type="text" name="status" /></label>
+        <label>CV version <input type="text" name="cv_version" /></label>
+        <label>Cover version <input type="text" name="cover_version" /></label>
+        <label>Notes <textarea name="notes"></textarea></label>
+        <button type="submit">POST /api/applications/add</button>
+      </form>
+    </section>
+    <h3>Recent jobs</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Company</th><th>Role</th><th>Link</th><th>Salary</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for j in jobs %}
+        <tr>
+          <td>{{ j.id }}</td>
+          <td>{{ j.company }}</td>
+          <td>{{ j.role }}</td>
+          <td><a href="{{ j.link }}">{{ j.link[:48] }}{% if j.link|length > 48 %}…{% endif %}</a></td>
+          <td>{{ j.salary_text or '' }}</td>
+          <td>{{ j.status or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No jobs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3 style="margin-top: 1.25rem;">Recent applications</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Company</th><th>Role</th><th>Applied</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in applications %}
+        <tr>
+          <td>{{ a.id }}</td>
+          <td>{{ a.company }}</td>
+          <td>{{ a.role }}</td>
+          <td>{{ a.date_applied }}</td>
+          <td>{{ a.status or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No applications yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 5) Operations & Monitoring -->
+  <div class="page-section" id="section-operations">
+    <h2>Operations &amp; Monitoring</h2>
+    <p class="section-help">Run scrapes, inspect raw API responses, and view the monitor agent snapshot. Tailor responses may include <code>provider_used</code> and <code>provider_fallback</code> (see JSON panel).</p>
+    <section class="card" style="margin-bottom: 1rem;">
+      <h3>Run scrape</h3>
+      <form id="form-scrape">
+        <label>URLs (one per line) <textarea name="urls" required placeholder="https://..."></textarea></label>
+        <label>Min salary GBP <input type="number" name="min_salary_gbp" value="60000" /></label>
+        <button type="submit">POST /api/scrape/run</button>
+      </form>
+    </section>
+    <h3>API response</h3>
+    <pre class="api-out" id="api-out">(none yet)</pre>
+    <h3 style="margin-top: 1.25rem;">Monitor snapshot</h3>
+    <pre class="snapshot">{{ monitor_json }}</pre>
+  </div>
+
+  <script>
+    const out = document.getElementById('api-out');
+    const tailorCvOut = document.getElementById('tailor-cv-out');
+    const tailorCoverOut = document.getElementById('tailor-cover-out');
+    const tailorMeta = document.getElementById('tailor-meta');
+
+    /** Write the latest raw API payload into the dark JSON panel. */
+    function showResponse(text) { out.textContent = text; }
+
+    /**
+     * POST JSON and mirror the response into #api-out.
+     * @param {string} url
+     * @param {object} body
+     */
+    async function postJson(url, body) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const txt = await res.text();
+      let pretty = txt;
+      try { pretty = JSON.stringify(JSON.parse(txt), null, 2); } catch (e) {}
+      showResponse(res.status + ' ' + res.statusText + '\n' + pretty);
+    }
+
+    /**
+     * Read optional provider fields from tailor JSON (top-level or nested under result).
+     * @param {object|null} parsed
+     * @returns {{ provider_used: string|null, provider_fallback: boolean|null }}
+     */
+    function tailorProviderMeta(parsed) {
+      if (!parsed || typeof parsed !== 'object') {
+        return { provider_used: null, provider_fallback: null };
+      }
+      const inner = parsed.result && typeof parsed.result === 'object' ? parsed.result : {};
+      const used = parsed.provider_used ?? inner.provider_used ?? null;
+      const fb = parsed.provider_fallback ?? inner.provider_fallback ?? null;
+      return {
+        provider_used: used != null ? String(used) : null,
+        provider_fallback: typeof fb === 'boolean' ? fb : (fb === 'true' || fb === '1' ? true : (fb === 'false' || fb === '0' ? false : null)),
+      };
+    }
+
+    /**
+     * Format tailor API JSON for #api-out and tailored markdown outputs.
+     * @param {Response} res
+     * @param {string} txt
+     */
+    function applyTailorPanels(res, txt) {
+      let pretty = txt;
+      let parsed = null;
+      try { parsed = JSON.parse(txt); pretty = JSON.stringify(parsed, null, 2); } catch (e) {}
+      showResponse(res.status + ' ' + res.statusText + '\n' + pretty);
+      if (tailorMeta) {
+        const { provider_used, provider_fallback } = tailorProviderMeta(parsed);
+        if (provider_used != null || provider_fallback != null) {
+          const parts = [];
+          if (provider_used != null) parts.push('provider: ' + provider_used);
+          if (provider_fallback != null) parts.push('fallback: ' + provider_fallback);
+          tailorMeta.textContent = parts.join(' · ');
+        } else {
+          tailorMeta.textContent = '';
+        }
+      }
+      if (!tailorCvOut || !tailorCoverOut) return;
+      const cv = parsed && typeof parsed.tailored_cv_markdown === 'string'
+        ? parsed.tailored_cv_markdown
+        : (parsed && parsed.result && typeof parsed.result.tailored_cv_markdown === 'string'
+          ? parsed.result.tailored_cv_markdown
+          : null);
+      const cover = parsed && typeof parsed.tailored_cover_markdown === 'string'
+        ? parsed.tailored_cover_markdown
+        : (parsed && parsed.result && typeof parsed.result.tailored_cover_markdown === 'string'
+          ? parsed.result.tailored_cover_markdown
+          : null);
+      const pm = parsed && parsed.result && typeof parsed.result.prompt_markdown === 'string'
+        ? parsed.result.prompt_markdown
+        : null;
+      if (cv) {
+        tailorCvOut.textContent = cv;
+      } else if (pm) {
+        tailorCvOut.textContent = "No tailored_cv_markdown found. Prompt output:\n\n" + pm;
+      } else if (parsed && parsed.error) {
+        tailorCvOut.textContent = String(parsed.error);
+      } else if (parsed && parsed.timed_out) {
+        tailorCvOut.textContent = 'Request timed out; see API response for task_id.';
+      } else {
+        tailorCvOut.textContent = 'No tailored CV found in response (see API response panel).';
+      }
+
+      if (cover) {
+        tailorCoverOut.textContent = cover;
+      } else if (parsed && parsed.error) {
+        tailorCoverOut.textContent = String(parsed.error);
+      } else if (parsed && parsed.timed_out) {
+        tailorCoverOut.textContent = 'Request timed out; see API response for task_id.';
+      } else {
+        tailorCoverOut.textContent = 'No tailored cover letter found in response (see API response panel).';
+      }
+    }
+
+    function parseRoles(raw) {
+      return raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    }
+    function parseUrls(raw) {
+      return raw.split(/\n+/).map(s => s.trim()).filter(Boolean);
+    }
+
+    document.getElementById('form-kb-text').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const res = await fetch('/api/kb/add-text', { method: 'POST', body: fd });
+      const txt = await res.text();
+      try { showResponse(res.status + '\n' + JSON.stringify(JSON.parse(txt), null, 2)); }
+      catch (err) { showResponse(res.status + '\n' + txt); }
+    });
+
+    document.getElementById('form-kb-upload').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData();
+      fd.append('file', e.target.file.files[0]);
+      const res = await fetch('/api/kb/upload', { method: 'POST', body: fd });
+      const txt = await res.text();
+      try { showResponse(res.status + '\n' + JSON.stringify(JSON.parse(txt), null, 2)); }
+      catch (err) { showResponse(res.status + '\n' + txt); }
+    });
+
+    document.getElementById('form-score').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const t = e.target;
+      postJson('/api/jobs/score', {
+        jd_text: t.jd_text.value,
+        target_roles: parseRoles(t.target_roles.value),
+        required_salary_gbp: Number(t.required_salary_gbp.value) || 60000,
+      });
+    });
+
+    document.getElementById('form-tailor').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const t = e.target;
+      const res = await fetch('/api/jobs/tailor-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jd_text: t.jd_text.value,
+          master_cv_markdown: t.master_cv_markdown.value,
+        }),
+      });
+      const txt = await res.text();
+      applyTailorPanels(res, txt);
+    });
+
+    document.getElementById('form-scrape').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const t = e.target;
+      postJson('/api/scrape/run', {
+        urls: parseUrls(t.urls.value),
+        min_salary_gbp: Number(t.min_salary_gbp.value) || 60000,
+      });
+    });
+
+    document.getElementById('form-app').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const t = e.target;
+      const body = {
+        company: t.company.value,
+        role: t.role.value,
+        link: t.link.value,
+        date_applied: t.date_applied.value,
+        status: t.status.value || null,
+        cv_version: t.cv_version.value || null,
+        cover_version: t.cover_version.value || null,
+        notes: t.notes.value || null,
+      };
+      postJson('/api/applications/add', body);
+    });
+
+    document.getElementById('form-pdf').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const t = e.target;
+      postJson('/api/cv/export-pdf', {
+        markdown_text: t.markdown_text.value,
+        output_name: t.output_name.value || null,
+      });
+    });
+  </script>
+</body>
+</html>

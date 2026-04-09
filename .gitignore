@@ -1,0 +1,54 @@
+# -----------------------------
+# Python bytecode and caches
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# -----------------------------
+# Virtual environments
+# -----------------------------
+.venv/
+venv/
+env/
+
+# -----------------------------
+# Local environment / secrets
+# -----------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# -----------------------------
+# OS / editor artifacts
+# -----------------------------
+.DS_Store
+.idea/
+.vscode/
+
+# -----------------------------
+# Logs and temporary files
+# -----------------------------
+*.log
+*.tmp
+tmp/
+
+# -----------------------------
+# Local runtime/generated data
+# -----------------------------
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/uploads/
+output/
+
+# -----------------------------
+# CSV
+# -----------------------------
+*.csv

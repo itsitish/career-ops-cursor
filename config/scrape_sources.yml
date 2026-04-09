@@ -1,0 +1,12 @@
+# Placeholder URLs — replace with your own searches and company boards.
+urls:
+  # LinkedIn job search (example query + UK)
+  - "https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=United%20Kingdom"
+  # Indeed UK search
+  - "https://uk.indeed.com/jobs?q=software+engineer&l=London"
+  # Glassdoor UK search
+  - "https://www.glassdoor.co.uk/Job/london-software-engineer-jobs-SRCH_IL.0,6_IC2671300_KO7,25.htm"
+  # Greenhouse board (sample company slug — change to a real board)
+  - "https://boards.greenhouse.io/examplecompany/jobs"
+  # Generic company careers listing (replace with a real careers page)
+  - "https://www.example.com/careers/jobs"

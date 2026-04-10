@@ -20,13 +20,13 @@ from pypdf import PdfReader
 
 from app.services.agent_bus import TaskRecord, TaskStatus
 from app.services.ats_worker import AtsScoringWorker
-from app.services.cursor_cloud_agent_provider import CursorCloudAgentProvider
+from app.services.cursor_response import parse_cursor_response_json
 from app.services.cv_tailor_worker import CvTailorWorker
-from app.services.llm_provider import TailorLLMProvider
 from app.services.monitor_agent import MonitorAgent
 from app.services.pdf_export import markdown_to_pdf
 from app.services.scraper_worker import ScraperWorker
 from app.services import storage
+from app.settings import AppSettings, load_settings
 from docx import Document
 
 # Templates live next to this package under app/templates/
@@ -253,46 +253,6 @@ def latest_master_cv_text() -> Optional[str]:
     return fallback or None
 
 
-def _strip_json_fences(text: str) -> str:
-    """Remove optional fenced code wrapper around JSON."""
-    s = text.strip()
-    m = re.match(r"^```(?:json)?\s*\r?\n?(.*?)\r?\n?```\s*$", s, re.IGNORECASE | re.DOTALL)
-    return m.group(1).strip() if m else s
-
-
-def parse_cursor_response_json(
-    response_text: str, *, require_cover: bool = True
-) -> Dict[str, str]:
-    """
-    Parse Cursor chat response JSON and extract tailored markdown fields.
-
-    Keys:
-    - ``tailored_cv_markdown`` (required)
-    - ``tailored_cover_markdown`` (required when ``require_cover`` is True)
-    """
-    raw = _strip_json_fences(response_text)
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Response is not valid JSON: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise ValueError("Response JSON must be an object.")
-    cv = parsed.get("tailored_cv_markdown")
-    cover = parsed.get("tailored_cover_markdown")
-    if not isinstance(cv, str) or not cv.strip():
-        raise ValueError("Missing or invalid 'tailored_cv_markdown'.")
-    if require_cover:
-        if not isinstance(cover, str) or not cover.strip():
-            raise ValueError("Missing or invalid 'tailored_cover_markdown'.")
-        cover_out = cover.strip()
-    else:
-        cover_out = cover.strip() if isinstance(cover, str) and cover.strip() else ""
-    return {
-        "tailored_cv_markdown": cv.strip(),
-        "tailored_cover_markdown": cover_out,
-    }
-
-
 def build_copy_paste_prompt(base_prompt: str, *, cover_requested: bool = False) -> str:
     """
     Append strict JSON output instructions for the copy/paste Cursor workflow.
@@ -323,10 +283,13 @@ def build_copy_paste_prompt(base_prompt: str, *, cover_requested: bool = False) 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize DB, workers, monitor, and optional LLM provider; tear down on exit."""
+    """Initialize DB, workers, monitor, and profile settings; tear down on exit."""
     load_dotenv_file(_PROJECT_ROOT / ".env")
     storage.init_db()
     _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    settings = load_settings(_PROJECT_ROOT)
+    app.state.settings = settings
 
     monitor = MonitorAgent()
     monitor.register_worker(ScraperWorker())
@@ -334,8 +297,6 @@ async def lifespan(app: FastAPI):
     monitor.register_worker(CvTailorWorker())
     monitor.start()
     app.state.monitor = monitor
-    app.state.tailor_llm = TailorLLMProvider()
-    app.state.cloud_agent_provider = CursorCloudAgentProvider()
     app.state.latest_cursor_prompt = ""
     app.state.latest_tailored_cv = ""
     app.state.latest_tailored_cover = ""
@@ -352,6 +313,7 @@ app = FastAPI(title="Career Ops", lifespan=lifespan)
 async def dashboard(request: Request) -> Any:
     """Render the HTML dashboard with recent jobs, applications, and monitor snapshot."""
     monitor: MonitorAgent = request.app.state.monitor
+    settings: AppSettings = getattr(request.app.state, "settings", load_settings(_PROJECT_ROOT))
     jobs = storage.job_list(limit=30)
     applications = storage.application_list(limit=30)
     master_cv_prefill = latest_master_cv_text() or ""
@@ -371,6 +333,8 @@ async def dashboard(request: Request) -> Any:
             "latest_tailored_cv": latest_tailored_cv,
             "latest_tailored_cover": latest_tailored_cover,
             "monitor_json": snap_json,
+            "config_target_roles": settings.target_roles,
+            "config_min_salary_gbp": settings.min_salary_gbp,
         },
     )
 
@@ -423,13 +387,16 @@ async def api_jobs_score(
 ) -> JSONResponse:
     """Enqueue ``score_jd`` and block up to 8s for the scoring result."""
     monitor: MonitorAgent = request.app.state.monitor
+    settings: AppSettings = getattr(request.app.state, "settings", load_settings(_PROJECT_ROOT))
     jd_text = payload.get("jd_text")
     if jd_text is None:
         raise HTTPException(status_code=400, detail="jd_text required")
-    target_roles = payload.get("target_roles") or []
+    target_roles = payload.get("target_roles")
+    if target_roles is None or target_roles == []:
+        target_roles = list(settings.target_roles)
     if not isinstance(target_roles, list):
         target_roles = [str(target_roles)]
-    required_salary_gbp = payload.get("required_salary_gbp", 60000)
+    required_salary_gbp = payload.get("required_salary_gbp", settings.min_salary_gbp)
 
     task_id = monitor.enqueue(
         {
@@ -463,6 +430,7 @@ async def api_jobs_tailor_prompt(
     """
     Generate a Cursor-ready prompt for copy/paste workflow.
     """
+    settings: AppSettings = getattr(request.app.state, "settings", load_settings(_PROJECT_ROOT))
     monitor: MonitorAgent = request.app.state.monitor
     jd_text = payload.get("jd_text")
     master_cv = payload.get("master_cv_markdown")
@@ -489,6 +457,11 @@ async def api_jobs_tailor_prompt(
                 "master_cv_markdown": master_cv,
                 "kb_highlights": highlights,
                 "cover_requested": cover_requested,
+                "prompt_only": True,
+                "target_roles": settings.target_roles,
+                "sponsorship_note": settings.sponsorship_note,
+                "candidate_headline": settings.candidate_headline,
+                "locale_hint": settings.locale_hint,
             },
         }
     )
@@ -568,11 +541,12 @@ async def api_scrape_run(
     request: Request, payload: Dict[str, Any] = Body(...)
 ) -> JSONResponse:
     """Enqueue ``scrape_jobs``, wait up to 25s, upsert scraped rows, return counts."""
+    settings: AppSettings = getattr(request.app.state, "settings", load_settings(_PROJECT_ROOT))
     monitor: MonitorAgent = request.app.state.monitor
     urls = payload.get("urls") or []
     if not isinstance(urls, list):
         raise HTTPException(status_code=400, detail="urls must be a list")
-    min_salary_gbp = payload.get("min_salary_gbp", 60000)
+    min_salary_gbp = payload.get("min_salary_gbp", settings.min_salary_gbp)
 
     task_id = monitor.enqueue(
         {

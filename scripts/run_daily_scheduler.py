@@ -20,11 +20,11 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from app.settings import load_settings  # noqa: E402
 from app.services.scraper_worker import ScraperWorker  # noqa: E402
 from app.services.storage import Storage  # noqa: E402
 
 _CONFIG_PATH = _ROOT / "config" / "scrape_sources.yml"
-_MIN_SALARY_GBP = 60000
 
 
 def _load_urls() -> list[str]:
@@ -46,6 +46,7 @@ def _run_scrape_and_store() -> dict[str, Any]:
         Summary dict suitable for logging (counts, flags).
     """
     urls = _load_urls()
+    settings = load_settings(_ROOT)
     worker = ScraperWorker()
     storage = Storage()
     storage.init()
@@ -54,7 +55,7 @@ def _run_scrape_and_store() -> dict[str, Any]:
         "task_type": "scrape_jobs",
         "payload": {
             "urls": urls,
-            "min_salary_gbp": _MIN_SALARY_GBP,
+            "min_salary_gbp": settings.min_salary_gbp,
         },
     }
     result = worker.process(task)

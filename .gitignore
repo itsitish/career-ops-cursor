@@ -22,6 +22,9 @@ env/
 .env
 .env.*
 !.env.example
+
+# Local job-search profile (copy from config/profile.example.yml)
+config/profile.yml
 *.pem
 *.key
 

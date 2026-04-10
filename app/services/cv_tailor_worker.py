@@ -11,6 +11,13 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Tuple
 
+from app.services.prompt_analysis import (
+    extract_must_have_snippets,
+    infer_locale_instruction,
+    keyword_evidence_table_md,
+    top_jd_keywords,
+)
+
 # --- shared helpers -----------------------------------------------------------
 
 _STOPWORDS = frozenset(
@@ -519,13 +526,28 @@ class CvTailorWorker:
             kb = [str(kb)]
         kb_lines = [str(x).strip() for x in kb if str(x).strip()]
 
-        cover_requested = bool(payload.get("cover_requested", True))
+        cover_requested = bool(payload.get("cover_requested", False))
+        prompt_only = bool(payload.get("prompt_only", True))
+
+        target_roles = payload.get("target_roles") or []
+        if not isinstance(target_roles, list):
+            target_roles = [str(target_roles)]
+        else:
+            target_roles = [str(x).strip() for x in target_roles if str(x).strip()]
+
+        sponsorship_note = str(payload.get("sponsorship_note") or "").strip()
+        candidate_headline = str(payload.get("candidate_headline") or "").strip()
+        locale_hint = str(payload.get("locale_hint") or "en-GB").strip() or "en-GB"
 
         prompt_markdown = self._build_prompt_markdown(
             jd_text=jd_text.strip(),
             master_cv_markdown=master_cv.strip(),
             kb_highlights=kb_lines,
             cover_requested=cover_requested,
+            target_roles=target_roles,
+            sponsorship_note=sponsorship_note,
+            candidate_headline=candidate_headline,
+            locale_hint=locale_hint,
         )
         checklist = self._build_checklist(
             jd_text=jd_text.strip(),
@@ -536,16 +558,20 @@ class CvTailorWorker:
         preamble, _ = _split_preamble_and_sections(master_cv.splitlines())
         sign = _extract_sign_name(preamble)
 
-        tailored_cv = _build_tailored_cv_markdown(master_cv.strip(), jd_text.strip())
-        if cover_requested:
-            tailored_cover = _build_tailored_cover_markdown(
-                jd_text.strip(),
-                master_cv.strip(),
-                kb_lines,
-                sign_name=sign,
-            )
-        else:
+        if prompt_only:
+            tailored_cv = ""
             tailored_cover = ""
+        else:
+            tailored_cv = _build_tailored_cv_markdown(master_cv.strip(), jd_text.strip())
+            if cover_requested:
+                tailored_cover = _build_tailored_cover_markdown(
+                    jd_text.strip(),
+                    master_cv.strip(),
+                    kb_lines,
+                    sign_name=sign,
+                )
+            else:
+                tailored_cover = ""
 
         return {
             "prompt_markdown": prompt_markdown,
@@ -560,48 +586,88 @@ class CvTailorWorker:
         master_cv_markdown: str,
         kb_highlights: List[str],
         *,
-        cover_requested: bool = True,
+        cover_requested: bool = False,
+        target_roles: List[str] | None = None,
+        sponsorship_note: str = "",
+        candidate_headline: str = "",
+        locale_hint: str = "en-GB",
     ) -> str:
-        """Assemble the full Markdown prompt in a fixed section order."""
+        """
+        Assemble the full Markdown prompt: JD analysis, keyword evidence, tasks, constraints.
+
+        Designed for Cursor chat to refactor and reword the CV using only supplied facts.
+        """
+        tr = target_roles or []
         kb_block = _bullet_list(kb_highlights)
         cv_block = master_cv_markdown if master_cv_markdown else "_Master CV empty — paste your CV here._"
         jd_block = jd_text if jd_text else "_Job description empty — paste the JD here._"
 
+        must_lines = extract_must_have_snippets(jd_text) if jd_text.strip() else []
+        must_block = _bullet_list(must_lines) if must_lines else "_No lines extracted — rely on full JD above._"
+
+        jd_kw = top_jd_keywords(jd_text, limit=28) if jd_text.strip() else []
+        evidence_table = keyword_evidence_table_md(
+            jd_kw, master_cv_markdown, kb_highlights, max_rows=18
+        )
+        locale_line = infer_locale_instruction(jd_text, locale_hint)
+
+        profile_ctx = ""
+        if candidate_headline:
+            profile_ctx = f"**Candidate headline (from config):** {candidate_headline}\n\n"
+        if tr:
+            profile_ctx += "**Target role titles (from config):** " + ", ".join(tr) + "\n\n"
+        if sponsorship_note:
+            profile_ctx += "**Visa / sponsorship context (from config):** " + sponsorship_note + "\n\n"
+
         tasks_block = (
-            "1. **Tailored CV (Markdown)** — Reorder and rephrase bullets so the top third "
-            "matches the JD’s must-haves. Mirror JD keywords where truthful. Keep length "
-            "similar to the master unless the JD implies a shorter format.\n"
+            "1. **Tailored CV (Markdown)** — Refactor for clarity and ATS fit:\n"
+            "   - Reorder sections and bullets so the **first screen** reflects the JD’s strongest must-haves.\n"
+            "   - Rephrase bullets for impact (strong verbs, quantified facts **only** where already in the master).\n"
+            "   - Mirror important JD keywords **where truthful**; use the evidence table — do not claim **none** rows.\n"
+            "   - Keep length comparable to the master unless the JD implies one page / short form.\n"
         )
         n = 2
         if cover_requested:
             tasks_block += (
-                f"{n}. **Cover letter (Markdown)** — 250–350 words, role-specific opening, 2–3 "
-                "evidence-backed paragraphs tied to JD themes, concise closing.\n"
+                f"{n}. **Cover letter (Markdown)** — 250–350 words: specific opening, 2–3 paragraphs "
+                "with evidence from master/KB only, concise closing.\n"
             )
             n += 1
         tasks_block += (
-            f"{n}. **Change log** — Bullet list of what you changed vs the master and why "
-            "(JD alignment only).\n"
+            f"{n}. **Change log** — Markdown bullet list: what changed vs the master and **why** "
+            "(JD alignment). Call out **gaps** where the JD asks for something not in the materials.\n"
         )
 
         return (
             "## Role\n"
-            "You are helping refine a job application. Use only the facts present in "
-            "the **Master CV** and **Knowledge-base highlights**; do not invent employers, "
-            "dates, metrics, degrees, or tools.\n\n"
+            "You are refining a job application in **Cursor**. Use **only** facts present in the "
+            "**Master CV** and **Knowledge-base highlights**. Do not invent employers, dates, metrics, "
+            "degrees, certifications, or tools. If a JD requirement is not evidenced, state it in the "
+            "change log as a gap — do not imply you have it.\n\n"
+            f"{profile_ctx}"
             "## Job description (verbatim)\n"
             f"{jd_block}\n\n"
+            "## JD signals (deterministic extract)\n"
+            "### Lines likely tied to requirements / responsibilities\n"
+            f"{must_block}\n\n"
+            "### Keyword ↔ evidence (master CV + KB)\n"
+            "Use this to prioritize wording and to flag honest gaps.\n\n"
+            f"{evidence_table}\n\n"
             "## Master CV (Markdown)\n"
             f"{cv_block}\n\n"
             "## Knowledge-base highlights (trusted facts / themes)\n"
             f"{kb_block}\n\n"
+            "## Rewriting guidance\n"
+            "- " + locale_line + "\n"
+            "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
+            "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
+            "- **No fabrication:** paraphrase and compress; never add employers, tools, or numbers not in the source.\n\n"
             "## Tasks\n"
             f"{tasks_block}\n"
             "## Constraints\n"
             "- No fabricated achievements, numbers, or credentials.\n"
             "- If the JD requires something not evidenced in the master CV or highlights, "
-            "note the gap in the change log instead of implying it.\n"
-            "- British English if the JD is UK-based; otherwise match the JD’s locale/spelling.\n"
+            "document it only in the **change log** as a gap.\n"
         )
 
     def _build_checklist(

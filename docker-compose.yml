@@ -6,6 +6,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./output:/app/output
+      - ./config:/app/config
 
   scheduler:
     profiles:
@@ -16,3 +17,4 @@ services:
     volumes:
       - ./data:/app/data
       - ./output:/app/output
+      - ./config:/app/config

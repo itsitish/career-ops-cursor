@@ -4,54 +4,90 @@
   <meta charset="utf-8" />
   <title>Career Ops</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 1.25rem; max-width: 1200px; color: #1a1a1a; }
-    h1 { font-size: 1.35rem; }
+    :root {
+      --bg: #f5f0ff;
+      --surface: #fff9fb;
+      --card: #eef6ff;
+      --card-border: #c9d8f0;
+      --text: #2d2a32;
+      --muted: #5c5a62;
+      --accent: #7eb6d4;
+      --accent-soft: #b8dfe8;
+      --pre-api-bg: #2b2d38;
+      --pre-api-fg: #e8e6ef;
+      --prompt-bg: #fffdf7;
+      --prompt-border: #e0d4c8;
+    }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 1.25rem 1.5rem 2rem;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+      color: var(--text);
+      background: linear-gradient(165deg, var(--bg) 0%, #e8f5f0 45%, #f8f0ff 100%);
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.35rem; color: #3d3a44; }
     .page-section {
       margin-bottom: 2rem;
       padding-bottom: 1.5rem;
-      border-bottom: 1px solid #e0e0e0;
+      border-bottom: 1px solid var(--card-border);
     }
     .page-section:last-of-type { border-bottom: none; }
     .page-section > h2 {
       font-size: 1.15rem;
       margin: 0 0 0.35rem 0;
-      border-bottom: none;
-      padding-bottom: 0;
+      color: #4a5f7a;
     }
     .section-help {
-      color: #555;
+      color: var(--muted);
       font-size: 0.88rem;
       margin: 0 0 1rem 0;
       max-width: 48rem;
       line-height: 1.45;
     }
-    h3 { font-size: 1rem; margin: 0 0 0.5rem 0; }
+    h3 { font-size: 1rem; margin: 0 0 0.5rem 0; color: #4a5568; }
     .card {
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
       padding: 0.85rem 1rem;
-      background: #fafafa;
+      background: var(--card);
+      box-shadow: 0 1px 3px rgba(80, 100, 140, 0.08);
     }
     section.card { margin-bottom: 0; }
-    label { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
+    label { display: block; font-size: 0.85rem; margin-top: 0.5rem; color: #4a5568; }
     input[type="text"], input[type="number"], textarea, select {
       width: 100%;
       max-width: 42rem;
       box-sizing: border-box;
-      padding: 0.35rem;
+      padding: 0.4rem 0.5rem;
       margin-top: 0.15rem;
+      border: 1px solid #c5d0e0;
+      border-radius: 6px;
+      background: #fff;
     }
     textarea { min-height: 5rem; font-family: inherit; }
-    button { margin-top: 0.5rem; padding: 0.35rem 0.75rem; cursor: pointer; }
-    table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin-top: 0.5rem; }
-    th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
-    th { background: #f4f4f4; }
-    pre.snapshot { background: #f8f8f8; border: 1px solid #ddd; padding: 0.75rem; overflow: auto; font-size: 0.78rem; max-height: 18rem; }
-    pre.api-out { background: #1e1e1e; color: #e0e0e0; padding: 0.75rem; overflow: auto; font-size: 0.78rem; max-height: 14rem; }
-    /* Large readable area for tailor prompt markdown as plain text. */
+    button {
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.85rem;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid #9eb8d4;
+      background: linear-gradient(180deg, #e3f2ff 0%, var(--accent-soft) 100%);
+      color: #2c3e50;
+      font-weight: 500;
+    }
+    button:hover { filter: brightness(1.03); }
+    table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin-top: 0.5rem; background: var(--surface); border-radius: 8px; overflow: hidden; }
+    th, td { border: 1px solid #d4dce8; padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #dde8f5; color: #3d4d60; }
+    pre.snapshot { background: var(--surface); border: 1px solid var(--card-border); padding: 0.75rem; overflow: auto; font-size: 0.78rem; max-height: 18rem; border-radius: 8px; }
+    pre.api-out { background: var(--pre-api-bg); color: var(--pre-api-fg); padding: 0.75rem; overflow: auto; font-size: 0.78rem; max-height: 14rem; border-radius: 8px; }
     pre.tailor-out {
-      background: #fffef8;
-      border: 1px solid #d4c4a8;
+      background: var(--prompt-bg);
+      border: 1px solid var(--prompt-border);
       padding: 1rem;
       overflow: auto;
       font-size: 0.82rem;
@@ -60,13 +96,25 @@
       word-break: break-word;
       max-height: 28rem;
       margin-top: 0.5rem;
+      border-radius: 8px;
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; }
-    .muted { color: #666; font-size: 0.8rem; }
+    .muted { color: var(--muted); font-size: 0.8rem; }
+    .config-banner {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
     .copy-row {
       display: flex;
       justify-content: flex-end;
       margin-top: 0.3rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
     .copy-btn {
       margin-top: 0;
@@ -77,7 +125,12 @@
 </head>
 <body>
   <h1>Career Ops dashboard</h1>
-  <p class="muted">Forms call JSON APIs; full JSON appears in the API response panel under Operations.</p>
+  <div class="config-banner">
+    <strong>Profile defaults</strong> (from <code>config/profile.yml</code> or example):
+    min salary £{{ config_min_salary_gbp }}.
+    Target roles: {% if config_target_roles %}{{ config_target_roles | join(', ') }}{% else %}(none — edit profile){% endif %}.
+  </div>
+  <p class="muted">Forms call JSON APIs; section panels show the latest JSON response for that action.</p>
 
   <!-- 1) Knowledge Base -->
   <div class="page-section" id="section-knowledge-base">
@@ -151,6 +204,11 @@
         <label>Paste full Cursor JSON response
           <textarea name="response_text" required placeholder='{"tailored_cv_markdown":"...","tailored_cover_markdown":"..."}'></textarea>
         </label>
+        <p class="muted" style="margin: 0.5rem 0;">Use the same <strong>Generate cover letter</strong> choice as in Tailor prompt when ingesting (mirrors below).</p>
+        <label style="display: flex; align-items: center; gap: 0.5rem;">
+          <input type="checkbox" name="ingest_cover_requested" id="ingest-cover-requested" />
+          Expect cover letter in JSON (<code>tailored_cover_markdown</code>)
+        </label>
         <button type="submit">POST /api/jobs/ingest-cursor-response</button>
       </form>
     </section>
@@ -169,7 +227,10 @@
       <section class="card">
         <h3>Export PDF</h3>
         <form id="form-pdf">
-          <label>Markdown text <textarea name="markdown_text" required></textarea></label>
+          <label>Markdown text <textarea name="markdown_text" id="pdf-markdown-text" required></textarea></label>
+          <div class="copy-row" style="justify-content: flex-start;">
+            <button type="button" id="fill-pdf-from-cv-btn" class="copy-btn">Fill from tailored CV above</button>
+          </div>
           <label>Output filename (optional) <input type="text" name="output_name" placeholder="my-cv.pdf" /></label>
           <button type="submit">POST /api/cv/export-pdf</button>
         </form>
@@ -247,12 +308,12 @@
   <!-- 5) Operations & Monitoring -->
   <div class="page-section" id="section-operations">
     <h2>Operations &amp; Monitoring</h2>
-    <p class="section-help">Run scrapes, inspect raw API responses, and view the monitor agent snapshot. Tailor responses may include <code>provider_used</code> and <code>provider_fallback</code> (see JSON panel).</p>
+    <p class="section-help">Run scrapes, inspect raw API responses, and view the monitor agent snapshot.</p>
     <section class="card" style="margin-bottom: 1rem;">
       <h3>Run scrape</h3>
       <form id="form-scrape">
         <label>URLs (one per line) <textarea name="urls" required placeholder="https://..."></textarea></label>
-        <label>Min salary GBP <input type="number" name="min_salary_gbp" value="60000" /></label>
+        <label>Min salary GBP <input type="number" name="min_salary_gbp" value="{{ config_min_salary_gbp }}" /></label>
         <button type="submit">POST /api/scrape/run</button>
       </form>
     </section>
@@ -275,6 +336,19 @@
     const copyPromptBtn = document.getElementById('copy-prompt-btn');
     const copyCvBtn = document.getElementById('copy-cv-btn');
     const copyCoverBtn = document.getElementById('copy-cover-btn');
+    const tailorCoverChk = document.getElementById('tailor-cover-requested');
+    const ingestCoverChk = document.getElementById('ingest-cover-requested');
+    const fillPdfFromCvBtn = document.getElementById('fill-pdf-from-cv-btn');
+    const pdfMarkdownText = document.getElementById('pdf-markdown-text');
+
+    /** Keep ingest “expect cover” aligned with tailor cover checkbox. */
+    function syncCoverCheckboxes() {
+      if (tailorCoverChk && ingestCoverChk) {
+        ingestCoverChk.checked = tailorCoverChk.checked;
+      }
+    }
+    if (tailorCoverChk) tailorCoverChk.addEventListener('change', syncCoverCheckboxes);
+    syncCoverCheckboxes();
 
     /** Write API payload into a section response panel. */
     function showResponse(el, text) {
@@ -344,22 +418,55 @@
       return raw.split(/\n+/).map(s => s.trim()).filter(Boolean);
     }
 
+    /**
+     * Fallback when Clipboard API is unavailable (non-HTTPS except localhost) or denied.
+     * Uses deprecated execCommand — still the most reliable cross-browser fallback.
+     */
+    function copyViaExecCommand(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:2em;height:2em;padding:0;border:none;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      let ok = false;
+      try {
+        ok = document.execCommand('copy');
+      } finally {
+        document.body.removeChild(ta);
+      }
+      return ok;
+    }
+
     /** Copy text to clipboard and update button label briefly. */
     async function copyText(el, btn, successLabel) {
       if (!el || !btn) return;
       const original = btn.textContent;
-      const text = (el.textContent || '').trim();
-      if (!text) {
+      const text = el.textContent || '';
+      if (!text.trim()) {
         btn.textContent = 'Nothing to copy';
         setTimeout(() => { btn.textContent = original; }, 1200);
         return;
       }
+      let copied = false;
       try {
-        await navigator.clipboard.writeText(text);
-        btn.textContent = successLabel;
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        }
       } catch (e) {
-        btn.textContent = 'Copy failed';
+        copied = false;
       }
+      if (!copied) {
+        try {
+          copied = copyViaExecCommand(text);
+        } catch (e2) {
+          copied = false;
+        }
+      }
+      btn.textContent = copied ? successLabel : 'Copy failed';
       setTimeout(() => { btn.textContent = original; }, 1200);
     }
 
@@ -401,10 +508,15 @@
     document.getElementById('form-ingest-cursor').addEventListener('submit', async (e) => {
       e.preventDefault();
       const t = e.target;
+      const coverRequested = !!(tailorCoverChk && tailorCoverChk.checked);
+      if (ingestCoverChk) ingestCoverChk.checked = coverRequested;
       const res = await fetch('/api/jobs/ingest-cursor-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response_text: t.response_text.value }),
+        body: JSON.stringify({
+          response_text: t.response_text.value,
+          cover_requested: coverRequested,
+        }),
       });
       const txt = await res.text();
       applyIngestPanels(res, txt);
@@ -452,6 +564,11 @@
     }
     if (copyCoverBtn) {
       copyCoverBtn.addEventListener('click', () => copyText(tailorCoverOut, copyCoverBtn, 'Copied Cover'));
+    }
+    if (fillPdfFromCvBtn && pdfMarkdownText && tailorCvOut) {
+      fillPdfFromCvBtn.addEventListener('click', () => {
+        pdfMarkdownText.value = (tailorCvOut.textContent || '').trim();
+      });
     }
   </script>
 </body>

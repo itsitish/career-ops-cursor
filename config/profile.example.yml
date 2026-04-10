@@ -1,0 +1,28 @@
+# Copy to config/profile.yml and customize (profile.yml is gitignored by default).
+# Used for JD scoring defaults, scrape salary floor, and text injected into Cursor tailor prompts.
+
+candidate:
+  headline: "Your one-line professional headline (optional)"
+
+target_roles:
+  primary:
+    - "Machine Learning Engineer"
+    - "Data Scientist"
+    - "AI Engineer"
+    - "Senior Data Scientist"
+    - "Senior Python Engineer"
+    - "Senior Software Engineer"
+  # Optional: named archetypes for keyword overlap scoring
+  # archetypes:
+  #   - name: "MLOps Engineer"
+  #     level: "Senior"
+  #     fit: "primary"
+
+compensation:
+  minimum_gbp: 60000
+
+location:
+  # Shown inside the Cursor prompt so the model knows your visa/sponsorship context.
+  visa_sponsorship_note: "e.g. I require Skilled Worker sponsorship (UK)."
+
+locale: en-GB

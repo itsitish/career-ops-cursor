@@ -8,6 +8,7 @@ import json
 import os
 import time
 import uuid
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
@@ -19,6 +20,7 @@ from pypdf import PdfReader
 
 from app.services.agent_bus import TaskRecord, TaskStatus
 from app.services.ats_worker import AtsScoringWorker
+from app.services.cursor_cloud_agent_provider import CursorCloudAgentProvider
 from app.services.cv_tailor_worker import CvTailorWorker
 from app.services.llm_provider import TailorLLMProvider
 from app.services.monitor_agent import MonitorAgent
@@ -188,6 +190,45 @@ def dedupe_kb_highlights(highlights: List[str]) -> List[str]:
     return out
 
 
+def _kb_overlap_tokens(text: str) -> set[str]:
+    """Lowercase alphanumeric tokens (length > 2) for overlap checks."""
+    return {m.group(0) for m in re.finditer(r"[a-z0-9]{3,}", text.lower())}
+
+
+def filter_kb_highlights_vs_master_cv(highlights: List[str], master_cv: str) -> List[str]:
+    """
+    Drop KB highlights that largely duplicate master CV lines (substring or token coverage).
+
+    Keeps concise highlights that add information beyond any single CV line; order preserved.
+    """
+    master_norm = " ".join(master_cv.split()).casefold()
+    line_token_sets: List[set[str]] = []
+    for line in master_cv.splitlines():
+        s = line.strip()
+        if len(s) < 10:
+            continue
+        ts = _kb_overlap_tokens(s)
+        if len(ts) >= 4:
+            line_token_sets.append(ts)
+
+    def is_redundant(h: str) -> bool:
+        raw = h.strip()
+        if not raw:
+            return True
+        norm_h = " ".join(raw.split()).casefold()
+        if len(norm_h) >= 28 and norm_h in master_norm:
+            return True
+        th = _kb_overlap_tokens(raw)
+        if len(th) < 3:
+            return False
+        if not line_token_sets:
+            return False
+        best = max(len(th & lt) / len(th) for lt in line_token_sets)
+        return best >= 0.72
+
+    return [h.strip() for h in highlights if not is_redundant(h)]
+
+
 def latest_master_cv_text() -> Optional[str]:
     """
     Return the best candidate master CV text from KB uploads.
@@ -212,6 +253,74 @@ def latest_master_cv_text() -> Optional[str]:
     return fallback or None
 
 
+def _strip_json_fences(text: str) -> str:
+    """Remove optional fenced code wrapper around JSON."""
+    s = text.strip()
+    m = re.match(r"^```(?:json)?\s*\r?\n?(.*?)\r?\n?```\s*$", s, re.IGNORECASE | re.DOTALL)
+    return m.group(1).strip() if m else s
+
+
+def parse_cursor_response_json(
+    response_text: str, *, require_cover: bool = True
+) -> Dict[str, str]:
+    """
+    Parse Cursor chat response JSON and extract tailored markdown fields.
+
+    Keys:
+    - ``tailored_cv_markdown`` (required)
+    - ``tailored_cover_markdown`` (required when ``require_cover`` is True)
+    """
+    raw = _strip_json_fences(response_text)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Response is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("Response JSON must be an object.")
+    cv = parsed.get("tailored_cv_markdown")
+    cover = parsed.get("tailored_cover_markdown")
+    if not isinstance(cv, str) or not cv.strip():
+        raise ValueError("Missing or invalid 'tailored_cv_markdown'.")
+    if require_cover:
+        if not isinstance(cover, str) or not cover.strip():
+            raise ValueError("Missing or invalid 'tailored_cover_markdown'.")
+        cover_out = cover.strip()
+    else:
+        cover_out = cover.strip() if isinstance(cover, str) and cover.strip() else ""
+    return {
+        "tailored_cv_markdown": cv.strip(),
+        "tailored_cover_markdown": cover_out,
+    }
+
+
+def build_copy_paste_prompt(base_prompt: str, *, cover_requested: bool = False) -> str:
+    """
+    Append strict JSON output instructions for the copy/paste Cursor workflow.
+
+    When ``cover_requested`` is False, the model must return only ``tailored_cv_markdown``.
+    """
+    if cover_requested:
+        suffix = (
+            "\n\n## Output format (strict)\n"
+            "Return ONLY valid JSON in this exact shape:\n"
+            "{\n"
+            '  "tailored_cv_markdown": "<markdown cv>",\n'
+            '  "tailored_cover_markdown": "<markdown cover letter>"\n'
+            "}\n"
+            "No markdown fences, no extra commentary."
+        )
+    else:
+        suffix = (
+            "\n\n## Output format (strict)\n"
+            "Return ONLY valid JSON in this exact shape:\n"
+            "{\n"
+            '  "tailored_cv_markdown": "<markdown cv>"\n'
+            "}\n"
+            "Do not add a cover letter field. No markdown fences, no extra commentary."
+        )
+    return f"{base_prompt.rstrip()}\n{suffix}\n"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize DB, workers, monitor, and optional LLM provider; tear down on exit."""
@@ -226,6 +335,10 @@ async def lifespan(app: FastAPI):
     monitor.start()
     app.state.monitor = monitor
     app.state.tailor_llm = TailorLLMProvider()
+    app.state.cloud_agent_provider = CursorCloudAgentProvider()
+    app.state.latest_cursor_prompt = ""
+    app.state.latest_tailored_cv = ""
+    app.state.latest_tailored_cover = ""
 
     yield
 
@@ -242,6 +355,9 @@ async def dashboard(request: Request) -> Any:
     jobs = storage.job_list(limit=30)
     applications = storage.application_list(limit=30)
     master_cv_prefill = latest_master_cv_text() or ""
+    latest_cursor_prompt = str(getattr(request.app.state, "latest_cursor_prompt", "") or "")
+    latest_tailored_cv = str(getattr(request.app.state, "latest_tailored_cv", "") or "")
+    latest_tailored_cover = str(getattr(request.app.state, "latest_tailored_cover", "") or "")
     snap = monitor.snapshot()
     snap_json = json.dumps(snap, indent=2, sort_keys=True)
     return templates.TemplateResponse(
@@ -251,6 +367,9 @@ async def dashboard(request: Request) -> Any:
             "jobs": jobs,
             "applications": applications,
             "master_cv_prefill": master_cv_prefill,
+            "latest_cursor_prompt": latest_cursor_prompt,
+            "latest_tailored_cv": latest_tailored_cv,
+            "latest_tailored_cover": latest_tailored_cover,
             "monitor_json": snap_json,
         },
     )
@@ -342,7 +461,7 @@ async def api_jobs_tailor_prompt(
     request: Request, payload: Dict[str, Any] = Body(...)
 ) -> JSONResponse:
     """
-    Load latest KB snippets, enqueue ``tailor_cv_prompt``, wait up to 8s, return prompt data.
+    Generate a Cursor-ready prompt for copy/paste workflow.
     """
     monitor: MonitorAgent = request.app.state.monitor
     jd_text = payload.get("jd_text")
@@ -357,8 +476,11 @@ async def api_jobs_tailor_prompt(
             detail="No master CV found. Upload your master CV first in 'Upload KB file'.",
         )
 
+    cover_requested = bool(payload.get("cover_requested", False))
+
     highlights_raw = kb_highlights_latest(10)
     highlights = dedupe_kb_highlights(highlights_raw)
+    highlights = filter_kb_highlights_vs_master_cv(highlights, master_cv)
     task_id = monitor.enqueue(
         {
             "type": "tailor_cv_prompt",
@@ -366,6 +488,7 @@ async def api_jobs_tailor_prompt(
                 "jd_text": jd_text,
                 "master_cv_markdown": master_cv,
                 "kb_highlights": highlights,
+                "cover_requested": cover_requested,
             },
         }
     )
@@ -382,61 +505,60 @@ async def api_jobs_tailor_prompt(
             status_code=500,
         )
     result: Dict[str, Any] = dict(rec.result or {})
-    tailored_cv = str(result.get("tailored_cv_markdown", "") or "")
-    tailored_cover = str(result.get("tailored_cover_markdown", "") or "")
+    base_prompt = str(result.get("prompt_markdown") or "")
+    cursor_prompt = build_copy_paste_prompt(base_prompt, cover_requested=cover_requested)
+    request.app.state.latest_cursor_prompt = cursor_prompt
 
-    tailor_llm: TailorLLMProvider = request.app.state.tailor_llm
-    if tailor_llm.is_enabled():
-        try:
-            llm_out = tailor_llm.generate(
-                str(jd_text),
-                str(master_cv).strip(),
-                highlights,
-            )
-            tailored_cv = llm_out["tailored_cv_markdown"]
-            tailored_cover = llm_out["tailored_cover_markdown"]
-            result["tailored_cv_markdown"] = tailored_cv
-            result["tailored_cover_markdown"] = tailored_cover
-            return JSONResponse(
-                {
-                    "ok": True,
-                    "task_id": task_id,
-                    "kb_entries_used": len(highlights_raw),
-                    "kb_entries_after_dedup": len(highlights),
-                    "tailored_cv_markdown": tailored_cv,
-                    "tailored_cover_markdown": tailored_cover,
-                    "result": result,
-                    "provider_used": llm_out["provider"],
-                    "provider_model": llm_out["model"],
-                    "provider_fallback": False,
-                }
-            )
-        except Exception as exc:  # noqa: BLE001 — surface concise error to client
-            err_msg = str(exc).strip() or type(exc).__name__
-            return JSONResponse(
-                {
-                    "ok": True,
-                    "task_id": task_id,
-                    "kb_entries_used": len(highlights_raw),
-                    "kb_entries_after_dedup": len(highlights),
-                    "tailored_cv_markdown": tailored_cv,
-                    "tailored_cover_markdown": tailored_cover,
-                    "result": result,
-                    "provider_used": "local-deterministic",
-                    "provider_fallback": True,
-                    "provider_error": err_msg,
-                }
-            )
+    next_ingest = (
+        "Paste this prompt into Cursor chat and paste its JSON response into "
+        "/api/jobs/ingest-cursor-response with the same cover_requested value."
+    )
 
     return JSONResponse(
         {
             "ok": True,
             "task_id": task_id,
+            "cover_requested": cover_requested,
             "kb_entries_used": len(highlights_raw),
             "kb_entries_after_dedup": len(highlights),
-            "tailored_cv_markdown": tailored_cv,
-            "tailored_cover_markdown": tailored_cover,
-            "result": result,
+            "workflow_mode": "copy-paste-cursor-chat",
+            "prompt_markdown": cursor_prompt,
+            "next_step": next_ingest,
+            "result": {
+                "prompt_markdown": cursor_prompt,
+                "checklist": result.get("checklist", []),
+            },
+        }
+    )
+
+
+@app.post("/api/jobs/ingest-cursor-response")
+async def api_jobs_ingest_cursor_response(
+    request: Request, payload: Dict[str, Any] = Body(...)
+) -> JSONResponse:
+    """
+    Ingest pasted Cursor chat response JSON and store latest tailored outputs in app state.
+    """
+    response_text = payload.get("response_text")
+    if not isinstance(response_text, str) or not response_text.strip():
+        raise HTTPException(status_code=400, detail="response_text required")
+    cover_requested = bool(payload.get("cover_requested", False))
+    try:
+        parsed = parse_cursor_response_json(
+            response_text, require_cover=cover_requested
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    request.app.state.latest_tailored_cv = parsed["tailored_cv_markdown"]
+    request.app.state.latest_tailored_cover = parsed["tailored_cover_markdown"]
+    return JSONResponse(
+        {
+            "ok": True,
+            "cover_requested": cover_requested,
+            "workflow_mode": "copy-paste-cursor-chat",
+            "tailored_cv_markdown": parsed["tailored_cv_markdown"],
+            "tailored_cover_markdown": parsed["tailored_cover_markdown"],
         }
     )
 

@@ -58,7 +58,8 @@ class TailorLLMProvider:
     Call an OpenAI-compatible ``/chat/completions`` endpoint to produce tailored
     Markdown CV and cover letter from JD, master CV, and KB highlights.
 
-    Enable with ``CURSOR_USE_LLM`` and set key, base URL, and optional model.
+    Enable with ``CURSOR_USE_LLM`` and set key, base URL, and a pinned model.
+    The same model is used for every tailor request.
     """
 
     def __init__(self) -> None:
@@ -66,8 +67,13 @@ class TailorLLMProvider:
         self._use_llm = _env_truthy(os.environ.get("CURSOR_USE_LLM"))
         self._api_key = (os.environ.get("CURSOR_API_KEY") or "").strip()
         self._base_url = (os.environ.get("CURSOR_OPENAI_BASE_URL") or "").strip().rstrip("/")
-        model_raw = os.environ.get("CURSOR_MODEL")
-        self._model = (model_raw.strip() if isinstance(model_raw, str) and model_raw.strip() else "gpt-4.1-mini")
+        model_raw = os.environ.get("CURSOR_PINNED_MODEL") or os.environ.get("CURSOR_MODEL")
+        # NOTE: exact model id depends on provider. Keep it pinned and explicit in .env.
+        self._model = (
+            model_raw.strip()
+            if isinstance(model_raw, str) and model_raw.strip()
+            else "claude-sonnet-4-6"
+        )
 
     def is_enabled(self) -> bool:
         """

@@ -519,23 +519,33 @@ class CvTailorWorker:
             kb = [str(kb)]
         kb_lines = [str(x).strip() for x in kb if str(x).strip()]
 
+        cover_requested = bool(payload.get("cover_requested", True))
+
         prompt_markdown = self._build_prompt_markdown(
             jd_text=jd_text.strip(),
             master_cv_markdown=master_cv.strip(),
             kb_highlights=kb_lines,
+            cover_requested=cover_requested,
         )
-        checklist = self._build_checklist(jd_text=jd_text.strip(), kb_highlights=kb_lines)
+        checklist = self._build_checklist(
+            jd_text=jd_text.strip(),
+            kb_highlights=kb_lines,
+            cover_requested=cover_requested,
+        )
 
         preamble, _ = _split_preamble_and_sections(master_cv.splitlines())
         sign = _extract_sign_name(preamble)
 
         tailored_cv = _build_tailored_cv_markdown(master_cv.strip(), jd_text.strip())
-        tailored_cover = _build_tailored_cover_markdown(
-            jd_text.strip(),
-            master_cv.strip(),
-            kb_lines,
-            sign_name=sign,
-        )
+        if cover_requested:
+            tailored_cover = _build_tailored_cover_markdown(
+                jd_text.strip(),
+                master_cv.strip(),
+                kb_lines,
+                sign_name=sign,
+            )
+        else:
+            tailored_cover = ""
 
         return {
             "prompt_markdown": prompt_markdown,
@@ -549,11 +559,30 @@ class CvTailorWorker:
         jd_text: str,
         master_cv_markdown: str,
         kb_highlights: List[str],
+        *,
+        cover_requested: bool = True,
     ) -> str:
         """Assemble the full Markdown prompt in a fixed section order."""
         kb_block = _bullet_list(kb_highlights)
         cv_block = master_cv_markdown if master_cv_markdown else "_Master CV empty — paste your CV here._"
         jd_block = jd_text if jd_text else "_Job description empty — paste the JD here._"
+
+        tasks_block = (
+            "1. **Tailored CV (Markdown)** — Reorder and rephrase bullets so the top third "
+            "matches the JD’s must-haves. Mirror JD keywords where truthful. Keep length "
+            "similar to the master unless the JD implies a shorter format.\n"
+        )
+        n = 2
+        if cover_requested:
+            tasks_block += (
+                f"{n}. **Cover letter (Markdown)** — 250–350 words, role-specific opening, 2–3 "
+                "evidence-backed paragraphs tied to JD themes, concise closing.\n"
+            )
+            n += 1
+        tasks_block += (
+            f"{n}. **Change log** — Bullet list of what you changed vs the master and why "
+            "(JD alignment only).\n"
+        )
 
         return (
             "## Role\n"
@@ -567,13 +596,7 @@ class CvTailorWorker:
             "## Knowledge-base highlights (trusted facts / themes)\n"
             f"{kb_block}\n\n"
             "## Tasks\n"
-            "1. **Tailored CV (Markdown)** — Reorder and rephrase bullets so the top third "
-            "matches the JD’s must-haves. Mirror JD keywords where truthful. Keep length "
-            "similar to the master unless the JD implies a shorter format.\n"
-            "2. **Cover letter (Markdown)** — 250–350 words, role-specific opening, 2–3 "
-            "evidence-backed paragraphs tied to JD themes, concise closing.\n"
-            "3. **Change log** — Bullet list of what you changed vs the master and why "
-            "(JD alignment only).\n\n"
+            f"{tasks_block}\n"
             "## Constraints\n"
             "- No fabricated achievements, numbers, or credentials.\n"
             "- If the JD requires something not evidenced in the master CV or highlights, "
@@ -581,7 +604,13 @@ class CvTailorWorker:
             "- British English if the JD is UK-based; otherwise match the JD’s locale/spelling.\n"
         )
 
-    def _build_checklist(self, jd_text: str, kb_highlights: List[str]) -> List[str]:
+    def _build_checklist(
+        self,
+        jd_text: str,
+        kb_highlights: List[str],
+        *,
+        cover_requested: bool = True,
+    ) -> List[str]:
         """Return a fixed, human-oriented review checklist (deterministic)."""
         has_jd = bool(jd_text.strip())
         has_kb = bool(kb_highlights)
@@ -590,9 +619,18 @@ class CvTailorWorker:
             "Confirm every stated tool, title, employer, and date appears in the master CV or KB highlights.",
             "Verify JD must-have requirements are either clearly evidenced or explicitly flagged as gaps.",
             "Check for accidental duplication or inflated seniority compared with the master CV.",
-            "Scan for spelling, grammar, and consistent tense in CV and cover letter.",
-            "Ensure the cover letter does not repeat the CV verbatim; it should add narrative context.",
         ]
+        if cover_requested:
+            items.extend(
+                [
+                    "Scan for spelling, grammar, and consistent tense in CV and cover letter.",
+                    "Ensure the cover letter does not repeat the CV verbatim; it should add narrative context.",
+                ]
+            )
+        else:
+            items.append(
+                "Scan for spelling, grammar, and consistent tense in the CV.",
+            )
         if not has_jd:
             items.insert(0, "Paste the full job description — checklist assumes JD was empty in the prompt.")
         if not has_kb:

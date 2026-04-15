@@ -39,6 +39,25 @@ _UPLOAD_DIR = storage.DATA_DIR / "uploads"
 # Repository root (parent of ``app/``) for optional ``.env``.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# KB list API / dashboard: max characters for one-line preview text.
+_KB_PREVIEW_CHARS = 240
+
+
+def _kb_summary_fields(row: dict[str, Any]) -> dict[str, Any]:
+    """Public fields for KB list (no full ``content`` body)."""
+    content = str(row.get("content") or "")
+    preview = " ".join(content.split())
+    if len(preview) > _KB_PREVIEW_CHARS:
+        preview = preview[:_KB_PREVIEW_CHARS] + "…"
+    return {
+        "id": int(row["id"]),
+        "entry_type": row.get("entry_type") or "",
+        "created_at": row.get("created_at") or "",
+        "source_file": row.get("source_file") or "",
+        "content_length": len(content),
+        "content_preview": preview,
+    }
+
 
 def load_dotenv_file(path: Path) -> None:
     """
@@ -322,12 +341,16 @@ async def dashboard(request: Request) -> Any:
     latest_tailored_cover = str(getattr(request.app.state, "latest_tailored_cover", "") or "")
     snap = monitor.snapshot()
     snap_json = json.dumps(snap, indent=2, sort_keys=True)
+    kb_rows = [
+        _kb_summary_fields(dict(r)) for r in storage.kb_list(limit=300, offset=0)
+    ]
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "jobs": jobs,
             "applications": applications,
+            "kb_rows": kb_rows,
             "master_cv_prefill": master_cv_prefill,
             "latest_cursor_prompt": latest_cursor_prompt,
             "latest_tailored_cv": latest_tailored_cv,
@@ -379,6 +402,41 @@ async def api_kb_upload(file: UploadFile = File(...)) -> JSONResponse:
     return JSONResponse(
         {"ok": True, "id": entry_id, "stored_path": str(dest), "chars": len(text)}
     )
+
+
+@app.get("/api/kb")
+async def api_kb_list(
+    limit: int = 200,
+    offset: int = 0,
+    entry_type: Optional[str] = None,
+) -> JSONResponse:
+    """
+    List knowledge-base entries (newest first). Optional ``entry_type`` filter.
+    """
+    limit = min(max(limit, 1), 500)
+    offset = max(offset, 0)
+    rows = storage.kb_list(
+        entry_type=entry_type, limit=limit, offset=offset
+    )
+    entries = [_kb_summary_fields(dict(r)) for r in rows]
+    return JSONResponse({"ok": True, "entries": entries})
+
+
+@app.get("/api/kb/{entry_id}")
+async def api_kb_get(entry_id: int) -> JSONResponse:
+    """Return one KB entry including full ``content``."""
+    row = storage.kb_get_by_id(entry_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="KB entry not found")
+    return JSONResponse({"ok": True, "entry": dict(row)})
+
+
+@app.delete("/api/kb/{entry_id}")
+async def api_kb_delete(entry_id: int) -> JSONResponse:
+    """Delete a knowledge-base row by id."""
+    if not storage.kb_delete(entry_id):
+        raise HTTPException(status_code=404, detail="KB entry not found")
+    return JSONResponse({"ok": True, "id": entry_id})
 
 
 @app.post("/api/jobs/score")
@@ -458,9 +516,6 @@ async def api_jobs_tailor_prompt(
                 "kb_highlights": highlights,
                 "cover_requested": cover_requested,
                 "prompt_only": True,
-                "target_roles": settings.target_roles,
-                "sponsorship_note": settings.sponsorship_note,
-                "candidate_headline": settings.candidate_headline,
                 "locale_hint": settings.locale_hint,
             },
         }
@@ -613,6 +668,14 @@ async def api_applications_add(payload: Dict[str, Any] = Body(...)) -> JSONRespo
         notes=payload.get("notes"),
     )
     return JSONResponse({"ok": True, "id": app_id})
+
+
+@app.delete("/api/jobs/{job_id}")
+async def api_jobs_delete(job_id: int) -> JSONResponse:
+    """Delete one job listing row by id (scraped jobs board)."""
+    if not storage.job_delete(job_id):
+        raise HTTPException(status_code=404, detail="job not found")
+    return JSONResponse({"ok": True, "id": job_id})
 
 
 @app.post("/api/cv/export-pdf")

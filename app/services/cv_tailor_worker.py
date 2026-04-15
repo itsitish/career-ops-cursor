@@ -496,6 +496,9 @@ class CvTailorWorker:
                     "jd_text": str,
                     "master_cv_markdown": str,
                     "kb_highlights": list[str],
+                    "cover_requested": bool (optional),
+                    "prompt_only": bool (optional),
+                    "locale_hint": str (optional, e.g. en-GB),
                 },
             }
 
@@ -529,14 +532,6 @@ class CvTailorWorker:
         cover_requested = bool(payload.get("cover_requested", False))
         prompt_only = bool(payload.get("prompt_only", True))
 
-        target_roles = payload.get("target_roles") or []
-        if not isinstance(target_roles, list):
-            target_roles = [str(target_roles)]
-        else:
-            target_roles = [str(x).strip() for x in target_roles if str(x).strip()]
-
-        sponsorship_note = str(payload.get("sponsorship_note") or "").strip()
-        candidate_headline = str(payload.get("candidate_headline") or "").strip()
         locale_hint = str(payload.get("locale_hint") or "en-GB").strip() or "en-GB"
 
         prompt_markdown = self._build_prompt_markdown(
@@ -544,9 +539,6 @@ class CvTailorWorker:
             master_cv_markdown=master_cv.strip(),
             kb_highlights=kb_lines,
             cover_requested=cover_requested,
-            target_roles=target_roles,
-            sponsorship_note=sponsorship_note,
-            candidate_headline=candidate_headline,
             locale_hint=locale_hint,
         )
         checklist = self._build_checklist(
@@ -587,9 +579,6 @@ class CvTailorWorker:
         kb_highlights: List[str],
         *,
         cover_requested: bool = False,
-        target_roles: List[str] | None = None,
-        sponsorship_note: str = "",
-        candidate_headline: str = "",
         locale_hint: str = "en-GB",
     ) -> str:
         """
@@ -597,7 +586,6 @@ class CvTailorWorker:
 
         Designed for Cursor chat to refactor and reword the CV using only supplied facts.
         """
-        tr = target_roles or []
         kb_block = _bullet_list(kb_highlights)
         cv_block = master_cv_markdown if master_cv_markdown else "_Master CV empty — paste your CV here._"
         jd_block = jd_text if jd_text else "_Job description empty — paste the JD here._"
@@ -611,16 +599,15 @@ class CvTailorWorker:
         )
         locale_line = infer_locale_instruction(jd_text, locale_hint)
 
-        profile_ctx = ""
-        if candidate_headline:
-            profile_ctx = f"**Candidate headline (from config):** {candidate_headline}\n\n"
-        if tr:
-            profile_ctx += "**Target role titles (from config):** " + ", ".join(tr) + "\n\n"
-        if sponsorship_note:
-            profile_ctx += "**Visa / sponsorship context (from config):** " + sponsorship_note + "\n\n"
-
         tasks_block = (
             "1. **Tailored CV (Markdown)** — Refactor for clarity and ATS fit:\n"
+            "   - Reorder and rewrite **experience bullets** so order and wording track the JD’s language and priority "
+            "(strongest matches first; mirror phrasing where truthful).\n"
+            "   - Reword the **headline / profile / summary** (if present) so it speaks directly to this role — "
+            "using only facts from the master CV and KB.\n"
+            "   - **Omit or heavily condense** roles, projects, or bullets that are irrelevant to this JD; in the "
+            "**change log**, note honestly what was removed or shortened and why (no fabricated gaps or implied "
+            "employment holes).\n"
             "   - Reorder sections and bullets so the **first screen** reflects the JD’s strongest must-haves.\n"
             "   - Rephrase bullets for impact (strong verbs, quantified facts **only** where already in the master).\n"
             "   - Mirror important JD keywords **where truthful**; use the evidence table — do not claim **none** rows.\n"
@@ -644,7 +631,6 @@ class CvTailorWorker:
             "**Master CV** and **Knowledge-base highlights**. Do not invent employers, dates, metrics, "
             "degrees, certifications, or tools. If a JD requirement is not evidenced, state it in the "
             "change log as a gap — do not imply you have it.\n\n"
-            f"{profile_ctx}"
             "## Job description (verbatim)\n"
             f"{jd_block}\n\n"
             "## JD signals (deterministic extract)\n"
@@ -661,6 +647,8 @@ class CvTailorWorker:
             "- " + locale_line + "\n"
             "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
             "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
+            "- **Markdown:** use `**bold**` sparingly in the tailored CV (e.g. a few role keywords); avoid wrapping "
+            "whole paragraphs.\n"
             "- **No fabrication:** paraphrase and compress; never add employers, tools, or numbers not in the source.\n\n"
             "## Tasks\n"
             f"{tasks_block}\n"

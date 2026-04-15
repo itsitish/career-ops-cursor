@@ -6,6 +6,7 @@ candidate:
 
 target_roles:
   primary:
+    - "MLOps Engineer"
     - "Machine Learning Engineer"
     - "Data Scientist"
     - "AI Engineer"

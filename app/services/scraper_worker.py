@@ -148,15 +148,42 @@ def _find_salary_snippet(container: Any) -> Optional[str]:
             t = _clean_text(sub, 500)
             if t:
                 return t
-    # Fallback: any text chunk mentioning £ or k in salary-like context
+    # LinkedIn / modern boards often use salary-specific class fragments
+    for sel in (
+        "[class*='salary']",
+        "[class*='compensation']",
+        "[class*='pay-range']",
+    ):
+        try:
+            node = container.select_one(sel)
+            if node:
+                t = _clean_text(node, 500)
+                if t and re.search(r"[\$£€]|\d+\s*k", t, re.I):
+                    return t
+        except Exception:
+            continue
+    # Fallback: GBP, USD, or k bands
     full = _clean_text(container, 4000)
-    m = re.search(r"£[\d,\s]+(?:\s*-\s*£[\d,\s]+)?|\d{2,3}\s*k(?:\s*-\s*\d{2,3}\s*k)?", full, re.I)
+    m = re.search(
+        r"£[\d,\s]+(?:\s*-\s*£[\d,\s]+)?|\$[\d,]+(?:\s*-\s*\$[\d,]+)?|\d{2,3}\s*k(?:\s*-\s*\d{2,3}\s*k)?",
+        full,
+        re.I,
+    )
     if m:
         return m.group(0).strip()
     return None
 
 
-def _extract_cards(soup: BeautifulSoup) -> list[Any]:
+def _is_linkedin_jobs_url(url: str) -> bool:
+    """True when URL is a LinkedIn jobs search or jobs listing page."""
+    try:
+        netloc = urlparse(url).netloc.lower()
+        return "linkedin.com" in netloc
+    except Exception:
+        return False
+
+
+def _extract_cards(soup: BeautifulSoup, page_url: str = "") -> list[Any]:
     """Collect candidate DOM nodes that might each be one job listing."""
     seen_ids: set[int] = set()
     out: list[Any] = []
@@ -166,6 +193,23 @@ def _extract_cards(soup: BeautifulSoup) -> list[Any]:
         if tid not in seen_ids:
             seen_ids.add(tid)
             out.append(tag)
+
+    # LinkedIn job search: server-rendered list items (classes change; match loosely).
+    if _is_linkedin_jobs_url(page_url):
+        for sel in (
+            "li.jobs-search-results__list-item",
+            "li[class*='jobs-search-results__list-item']",
+            "div.job-search-card",
+            "div[class*='job-search-card']",
+            "li.occludable-update[class*='jobs-search']",
+        ):
+            try:
+                for tag in soup.select(sel):
+                    add(tag)
+            except Exception:
+                continue
+        if out:
+            return out
 
     for tag in soup.find_all(_is_probably_job_container):
         add(tag)
@@ -191,6 +235,133 @@ def _extract_cards(soup: BeautifulSoup) -> list[Any]:
     return out
 
 
+def _split_linkedin_subtitle(text: str) -> tuple[str, str]:
+    """
+    LinkedIn often uses ``Company · Location`` in one subtitle line.
+
+    Returns:
+        (company_part, location_part)
+    """
+    text = text.strip()
+    if not text:
+        return "", ""
+    for sep in (" · ", " | ", " \u2013 ", " - "):
+        if sep in text:
+            parts = [p.strip() for p in text.split(sep, 1)]
+            if len(parts) == 2:
+                return parts[0], parts[1]
+    return text, ""
+
+
+def _normalize_linkedin_listing(
+    container: Any,
+    base_url: str,
+    page_source: str,
+) -> Optional[dict[str, Any]]:
+    """
+    Parse a LinkedIn job search card (structure varies; many selector fallbacks).
+
+    Prefer ``/jobs/view/`` links; title from ``h3`` with *search-card*title*; company from subtitle.
+    """
+    try:
+        link_el = container.select_one("a[href*='/jobs/view/'], a[href*='jobs/view']")
+        if link_el is None:
+            link_el = container.find("a", href=True)
+        if link_el is None and container.name == "a" and container.get("href"):
+            link_el = container
+        if link_el is None:
+            return None
+
+        href = (link_el.get("href") or "").strip()
+        if not href or href.startswith("#"):
+            return None
+
+        absolute = urljoin(base_url, href)
+        low = absolute.lower()
+        if "linkedin.com" not in low or "/jobs" not in low:
+            return None
+
+        role = ""
+        for sel in (
+            "h3[class*='base-search-card__title']",
+            "h3.base-search-card__title",
+            ".base-search-card__title",
+            "h3.job-search-card__title",
+            "h3[class*='job-card-list__title']",
+        ):
+            node = container.select_one(sel)
+            if node:
+                role = _clean_text(node, 400)
+                if role:
+                    break
+        if not role:
+            role = _clean_text(link_el, 400) or "Unknown role"
+
+        company = ""
+        location = ""
+        for sel in (
+            "h4[class*='base-search-card__subtitle']",
+            "h4.base-search-card__subtitle",
+            ".base-search-card__subtitle",
+            "[class*='job-search-card__subtitle']",
+            "[class*='job-card-container__company-name']",
+        ):
+            node = container.select_one(sel)
+            if node:
+                raw = _clean_text(node, 500)
+                if raw:
+                    company, location = _split_linkedin_subtitle(raw)
+                    break
+
+        if not company:
+            for sel in ("[class*='company']", "[class*='employer']"):
+                node = container.select_one(sel)
+                if node:
+                    t = _clean_text(node, 200)
+                    if t and t != role:
+                        company = t
+                        break
+
+        salary_text = _find_salary_snippet(container)
+        if not salary_text:
+            full = _clean_text(container, 2000)
+            m = re.search(
+                r"(£[\d,\s]+(?:\s*-\s*£[\d,\s]+)?|\$[\d,]+(?:k|/yr)?|\d{2,3}\s*k(?:\s*-\s*\d{2,3}\s*k)?)",
+                full,
+                re.I,
+            )
+            if m:
+                salary_text = m.group(0).strip()
+
+        if not location:
+            for sel in ("[class*='location']", "[class*='job-search-card__location']"):
+                node = container.select_one(sel)
+                if node:
+                    location = _clean_text(node, 200)
+                    if location:
+                        break
+
+        jd_text: Optional[str] = None
+        desc = container.find(["p", "div"], class_=re.compile(r"desc|summary|snippet|job-card-list__description", re.I))
+        if desc:
+            jd_text = _clean_text(desc, 4000) or None
+
+        parsed = urlparse(base_url)
+        source = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else page_source
+
+        return {
+            "company": company or "",
+            "role": role,
+            "link": absolute,
+            "salary_text": salary_text,
+            "location": location,
+            "source": source,
+            "jd_text": jd_text,
+        }
+    except Exception:
+        return None
+
+
 def _normalize_listing(
     container: Any,
     base_url: str,
@@ -204,6 +375,11 @@ def _normalize_listing(
         jd_text (optional), or None if no usable link/title.
     """
     try:
+        if _is_linkedin_jobs_url(base_url):
+            li = _normalize_linkedin_listing(container, base_url, page_source)
+            if li is not None:
+                return li
+
         link_el = container.find("a", href=True)
         if link_el is None and container.name == "a" and container.get("href"):
             link_el = container
@@ -358,7 +534,7 @@ class ScraperWorker:
                         )
                     else:
                         soup = BeautifulSoup(resp.text, "html.parser")
-                        cards = _extract_cards(soup)
+                        cards = _extract_cards(soup, page_url=url)
                         seen_links: set[str] = set()
                         for card in cards:
                             try:

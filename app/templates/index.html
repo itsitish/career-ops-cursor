@@ -121,6 +121,42 @@
       font-size: 0.78rem;
       padding: 0.28rem 0.55rem;
     }
+    .jobs-board-wrap {
+      max-height: 22rem;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .jobs-board-wrap table { margin-top: 0; }
+    .jobs-board-wrap th { position: sticky; top: 0; z-index: 1; }
+    .btn-delete-job {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      border: 1px solid #c9a8a8;
+      background: #ffe8e8;
+      color: #5c3030;
+    }
+    .btn-delete-job:hover { filter: brightness(0.97); }
+    .btn-kb-view {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      border: 1px solid #a8b8c9;
+      background: #eef3f9;
+      color: #2d3d4d;
+      margin-right: 0.35rem;
+    }
+    .btn-kb-view:hover { filter: brightness(0.97); }
+    .kb-board-wrap td.kb-preview-cell {
+      max-width: 28rem;
+      font-size: 0.85rem;
+      color: #333;
+      word-break: break-word;
+    }
+    #kb-view-dialog { border: 1px solid #ccc; border-radius: 8px; padding: 0.75rem; }
+    #kb-view-dialog::backdrop { background: rgba(0,0,0,0.35); }
   </style>
 </head>
 <body>
@@ -161,6 +197,44 @@
         </form>
       </section>
     </div>
+    <h3 style="margin-top: 1.25rem;">KB entries</h3>
+    <p class="muted" style="margin: 0 0 0.5rem 0;">
+      <code>GET /api/kb</code> — list; <code>GET /api/kb/{id}</code> — full text; <code>DELETE /api/kb/{id}</code> — remove row.
+    </p>
+    <div class="jobs-board-wrap kb-board-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Type</th><th>Created</th><th>Source</th><th>Preview</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="kb-table-tbody">
+        {% for e in kb_rows %}
+        <tr data-kb-row="{{ e.id }}">
+          <td>{{ e.id }}</td>
+          <td>{{ e.entry_type or '—' }}</td>
+          <td>{{ (e.created_at or '')[:19] }}</td>
+          <td title="{{ e.source_file or '' }}">{% if e.source_file %}{{ e.source_file[:40] }}{% if e.source_file|length > 40 %}…{% endif %}{% else %}—{% endif %}</td>
+          <td class="kb-preview-cell">{{ e.content_preview }}</td>
+          <td>
+            <button type="button" class="btn-kb-view" data-kb-view="{{ e.id }}" title="Full text">View</button>
+            <button type="button" class="btn-delete-job" data-delete-kb="{{ e.id }}" title="Delete this KB row">Remove</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No knowledge-base entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <dialog id="kb-view-dialog" aria-label="Knowledge base entry">
+      <div style="display:flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <strong id="kb-view-title">KB entry</strong>
+        <form method="dialog"><button type="submit">Close</button></form>
+      </div>
+      <pre id="kb-view-meta" class="muted" style="font-size: 0.8rem; margin: 0 0 0.5rem 0; white-space: pre-wrap;"></pre>
+      <pre id="kb-view-pre" style="white-space: pre-wrap; max-height: 65vh; overflow: auto; margin: 0; font-size: 0.9rem;"></pre>
+    </dialog>
     <h3 style="margin-top: 1rem;">API response</h3>
     <pre class="api-out" id="kb-api-out">(none yet)</pre>
   </div>
@@ -223,16 +297,23 @@
       <button type="button" id="copy-cover-btn" class="copy-btn">Copy Cover</button>
     </div>
     <pre class="tailor-out" id="tailor-cover-out">{{ latest_tailored_cover or 'Paste Cursor response above to populate this panel.' }}</pre>
-    <div class="grid" style="margin-top: 1rem;">
+    <h3 style="margin-top: 1rem;">Export PDF</h3>
+    <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code>.</p>
+    <div class="grid" style="margin-top: 0;">
       <section class="card">
-        <h3>Export PDF</h3>
-        <form id="form-pdf">
-          <label>Markdown text <textarea name="markdown_text" id="pdf-markdown-text" required></textarea></label>
-          <div class="copy-row" style="justify-content: flex-start;">
-            <button type="button" id="fill-pdf-from-cv-btn" class="copy-btn">Fill from tailored CV above</button>
-          </div>
-          <label>Output filename (optional) <input type="text" name="output_name" placeholder="my-cv.pdf" /></label>
-          <button type="submit">POST /api/cv/export-pdf</button>
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #4a5f7a;">CV only</h4>
+        <form id="form-pdf-cv">
+          <label>Markdown (tailored CV) <textarea name="markdown_text" id="pdf-cv-markdown-text" rows="8" placeholder="Populated after ingest or paste here.">{{ latest_tailored_cv }}</textarea></label>
+          <label>Output filename (optional) <input type="text" name="output_name" placeholder="tailored-cv.pdf" /></label>
+          <button type="submit">POST /api/cv/export-pdf (CV)</button>
+        </form>
+      </section>
+      <section class="card">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #4a5f7a;">Cover letter only</h4>
+        <form id="form-pdf-cover">
+          <label>Markdown (tailored cover) <textarea name="markdown_text" id="pdf-cover-markdown-text" rows="8" placeholder="Populated after ingest when cover is included, or paste here.">{{ latest_tailored_cover }}</textarea></label>
+          <label>Output filename (optional) <input type="text" name="output_name" placeholder="tailored-cover.pdf" /></label>
+          <button type="submit">POST /api/cv/export-pdf (cover)</button>
         </form>
       </section>
     </div>
@@ -259,27 +340,30 @@
       </form>
     </section>
     <h3>Recent jobs</h3>
+    <div class="jobs-board-wrap">
     <table>
       <thead>
         <tr>
-          <th>ID</th><th>Company</th><th>Role</th><th>Link</th><th>Salary</th><th>Status</th>
+          <th>ID</th><th>Company</th><th>Role</th><th>Link</th><th>Salary</th><th>Status</th><th></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="jobs-board-tbody">
         {% for j in jobs %}
-        <tr>
+        <tr data-job-row="{{ j.id }}">
           <td>{{ j.id }}</td>
-          <td>{{ j.company }}</td>
-          <td>{{ j.role }}</td>
-          <td><a href="{{ j.link }}">{{ j.link[:48] }}{% if j.link|length > 48 %}…{% endif %}</a></td>
-          <td>{{ j.salary_text or '' }}</td>
-          <td>{{ j.status or '' }}</td>
+          <td>{{ j.company or '—' }}</td>
+          <td>{{ j.role or '—' }}</td>
+          <td><a href="{{ j.link }}" target="_blank" rel="noopener">{{ j.link[:48] }}{% if j.link|length > 48 %}…{% endif %}</a></td>
+          <td>{{ j.salary_text or '—' }}</td>
+          <td>{{ j.status or '—' }}</td>
+          <td><button type="button" class="btn-delete-job" data-delete-job="{{ j.id }}" title="Remove from list">Remove</button></td>
         </tr>
         {% else %}
-        <tr><td colspan="6">No jobs yet.</td></tr>
+        <tr><td colspan="7">No jobs yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
     <h3 style="margin-top: 1.25rem;">Recent applications</h3>
     <table>
       <thead>
@@ -338,8 +422,69 @@
     const copyCoverBtn = document.getElementById('copy-cover-btn');
     const tailorCoverChk = document.getElementById('tailor-cover-requested');
     const ingestCoverChk = document.getElementById('ingest-cover-requested');
-    const fillPdfFromCvBtn = document.getElementById('fill-pdf-from-cv-btn');
-    const pdfMarkdownText = document.getElementById('pdf-markdown-text');
+    const pdfCvMarkdownText = document.getElementById('pdf-cv-markdown-text');
+    const pdfCoverMarkdownText = document.getElementById('pdf-cover-markdown-text');
+    const kbTableTbody = document.getElementById('kb-table-tbody');
+    const kbViewDialog = document.getElementById('kb-view-dialog');
+    const kbViewPre = document.getElementById('kb-view-pre');
+    const kbViewMeta = document.getElementById('kb-view-meta');
+    const kbViewTitle = document.getElementById('kb-view-title');
+
+    /** Escape text for safe insertion into HTML when building table rows from JSON. */
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Rebuild the KB table from GET /api/kb (after add/delete).
+     * @returns {Promise<boolean>} True if the request succeeded.
+     */
+    async function refreshKbTable() {
+      if (!kbTableTbody) return false;
+      try {
+        const res = await fetch('/api/kb?limit=300');
+        const txt = await res.text();
+        let data = null;
+        try { data = JSON.parse(txt); } catch (e) {}
+        if (!res.ok || !data || !Array.isArray(data.entries)) {
+          showResponse(kbApiOut, formatResponse(res, txt));
+          return false;
+        }
+        kbTableTbody.innerHTML = '';
+        if (data.entries.length === 0) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td colspan="6">No knowledge-base entries yet.</td>';
+          kbTableTbody.appendChild(tr);
+          return true;
+        }
+        for (const r of data.entries) {
+          const src = r.source_file ? String(r.source_file) : '';
+          const srcShort = src.length > 40 ? escapeHtml(src.slice(0, 40)) + '…' : escapeHtml(src || '—');
+          const when = escapeHtml((r.created_at || '').slice(0, 19));
+          const tr = document.createElement('tr');
+          tr.setAttribute('data-kb-row', String(r.id));
+          tr.innerHTML =
+            '<td>' + escapeHtml(String(r.id)) + '</td>' +
+            '<td>' + escapeHtml(r.entry_type || '—') + '</td>' +
+            '<td>' + when + '</td>' +
+            '<td title="' + escapeHtml(src) + '">' + (src ? srcShort : '—') + '</td>' +
+            '<td class="kb-preview-cell">' + escapeHtml(r.content_preview || '') + '</td>' +
+            '<td>' +
+            '<button type="button" class="btn-kb-view" data-kb-view="' + escapeHtml(String(r.id)) + '" title="Full text">View</button> ' +
+            '<button type="button" class="btn-delete-job" data-delete-kb="' + escapeHtml(String(r.id)) + '" title="Delete this KB row">Remove</button>' +
+            '</td>';
+          kbTableTbody.appendChild(tr);
+        }
+        return true;
+      } catch (err) {
+        showResponse(kbApiOut, 'KB list failed: ' + String(err));
+        return false;
+      }
+    }
 
     /** Keep ingest “expect cover” aligned with tailor cover checkbox. */
     function syncCoverCheckboxes() {
@@ -399,18 +544,26 @@
       }
     }
 
-    /** Handle pasted Cursor response ingestion and show resulting CV/Cover. */
+    /** Handle pasted Cursor response ingestion and show resulting CV/Cover + PDF textareas. */
     function applyIngestPanels(res, txt) {
       let pretty = txt;
       let parsed = null;
       try { parsed = JSON.parse(txt); pretty = JSON.stringify(parsed, null, 2); } catch (e) {}
       showResponse(cvApiOut, res.status + ' ' + res.statusText + '\n' + pretty);
-      if (!tailorCvOut || !tailorCoverOut || !parsed) return;
-      if (typeof parsed.tailored_cv_markdown === 'string') {
+      if (!res.ok || !parsed) return;
+      if (tailorCvOut && typeof parsed.tailored_cv_markdown === 'string') {
         tailorCvOut.textContent = parsed.tailored_cv_markdown;
       }
-      if (typeof parsed.tailored_cover_markdown === 'string') {
+      if (tailorCoverOut && typeof parsed.tailored_cover_markdown === 'string') {
         tailorCoverOut.textContent = parsed.tailored_cover_markdown;
+      }
+      if (pdfCvMarkdownText && typeof parsed.tailored_cv_markdown === 'string') {
+        pdfCvMarkdownText.value = parsed.tailored_cv_markdown;
+      }
+      if (pdfCoverMarkdownText) {
+        pdfCoverMarkdownText.value = typeof parsed.tailored_cover_markdown === 'string'
+          ? parsed.tailored_cover_markdown
+          : '';
       }
     }
 
@@ -476,6 +629,7 @@
       const res = await fetch('/api/kb/add-text', { method: 'POST', body: fd });
       const txt = await res.text();
       showResponse(kbApiOut, formatResponse(res, txt));
+      if (res.ok) await refreshKbTable();
     });
 
     document.getElementById('form-kb-upload').addEventListener('submit', async (e) => {
@@ -485,6 +639,7 @@
       const res = await fetch('/api/kb/upload', { method: 'POST', body: fd });
       const txt = await res.text();
       showResponse(kbApiOut, formatResponse(res, txt));
+      if (res.ok) await refreshKbTable();
     });
 
     document.getElementById('form-tailor').addEventListener('submit', async (e) => {
@@ -547,7 +702,16 @@
       postJson('/api/applications/add', body, appApiOut);
     });
 
-    document.getElementById('form-pdf').addEventListener('submit', (e) => {
+    document.getElementById('form-pdf-cv').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const t = e.target;
+      postJson('/api/cv/export-pdf', {
+        markdown_text: t.markdown_text.value,
+        output_name: t.output_name.value || null,
+      }, cvApiOut);
+    });
+
+    document.getElementById('form-pdf-cover').addEventListener('submit', (e) => {
       e.preventDefault();
       const t = e.target;
       postJson('/api/cv/export-pdf', {
@@ -565,9 +729,78 @@
     if (copyCoverBtn) {
       copyCoverBtn.addEventListener('click', () => copyText(tailorCoverOut, copyCoverBtn, 'Copied Cover'));
     }
-    if (fillPdfFromCvBtn && pdfMarkdownText && tailorCvOut) {
-      fillPdfFromCvBtn.addEventListener('click', () => {
-        pdfMarkdownText.value = (tailorCvOut.textContent || '').trim();
+
+    const jobsBoardTbody = document.getElementById('jobs-board-tbody');
+    if (jobsBoardTbody) {
+      jobsBoardTbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-delete-job]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-delete-job');
+        if (!id || !window.confirm('Remove job #' + id + ' from the list?')) return;
+        try {
+          const res = await fetch('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
+          const txt = await res.text();
+          showResponse(appApiOut, formatResponse(res, txt));
+          if (res.ok) {
+            const row = btn.closest('tr');
+            if (row) row.remove();
+            if (!jobsBoardTbody.querySelector('tr[data-job-row]')) {
+              const tr = document.createElement('tr');
+              tr.innerHTML = '<td colspan="7">No jobs yet.</td>';
+              jobsBoardTbody.appendChild(tr);
+            }
+          }
+        } catch (err) {
+          showResponse(appApiOut, 'Delete failed: ' + String(err));
+        }
+      });
+    }
+
+    if (kbTableTbody) {
+      kbTableTbody.addEventListener('click', async (e) => {
+        const viewBtn = e.target.closest('[data-kb-view]');
+        if (viewBtn) {
+          const id = viewBtn.getAttribute('data-kb-view');
+          if (!id) return;
+          try {
+            const res = await fetch('/api/kb/' + encodeURIComponent(id));
+            const txt = await res.text();
+            let data = null;
+            try { data = JSON.parse(txt); } catch (err) {}
+            if (!res.ok || !data || !data.entry) {
+              showResponse(kbApiOut, formatResponse(res, txt));
+              return;
+            }
+            const ent = data.entry;
+            if (kbViewTitle) kbViewTitle.textContent = 'KB #' + id + ' (' + (ent.entry_type || '') + ')';
+            if (kbViewMeta) {
+              const lines = [];
+              if (ent.created_at) lines.push('Created: ' + ent.created_at);
+              if (ent.source_file) lines.push('Source: ' + ent.source_file);
+              lines.push('Length: ' + String((ent.content || '').length) + ' chars');
+              kbViewMeta.textContent = lines.join('\n');
+            }
+            if (kbViewPre) kbViewPre.textContent = ent.content != null ? String(ent.content) : '';
+            if (kbViewDialog && typeof kbViewDialog.showModal === 'function') {
+              kbViewDialog.showModal();
+            }
+          } catch (err) {
+            showResponse(kbApiOut, 'View failed: ' + String(err));
+          }
+          return;
+        }
+        const delBtn = e.target.closest('[data-delete-kb]');
+        if (!delBtn) return;
+        const kid = delBtn.getAttribute('data-delete-kb');
+        if (!kid || !window.confirm('Delete knowledge-base entry #' + kid + '? This cannot be undone.')) return;
+        try {
+          const res = await fetch('/api/kb/' + encodeURIComponent(kid), { method: 'DELETE' });
+          const txt = await res.text();
+          showResponse(kbApiOut, formatResponse(res, txt));
+          if (res.ok) await refreshKbTable();
+        } catch (err) {
+          showResponse(kbApiOut, 'Delete failed: ' + String(err));
+        }
       });
     }
   </script>

@@ -1,9 +1,9 @@
 """
 PDF export helper for tailored CV/Cover markdown text.
 
-Splits content into a centered header (contact block up to GitHub line, or a short
-fallback prefix) and a left-aligned body. Supports markdown headings, inline **bold**,
-and ATS-safe ASCII punctuation replacements.
+Splits content into a centered header (through the GitHub/contact line when present,
+otherwise a short fallback prefix) and a left-aligned body. Supports markdown headings,
+inline **bold**, and ATS-safe ASCII punctuation replacements.
 """
 
 from __future__ import annotations
@@ -51,8 +51,9 @@ def _looks_like_name(line: str) -> bool:
 
 def _split_header_body(lines: list[str]) -> tuple[list[str], list[str]]:
     """
-    Header: from start through first line containing ``github`` (case-insensitive),
-    inclusive. If none: lines before first ``## `` (exclusive), capped at 10 lines.
+    Header: from start through the first line containing ``github``
+    (case-insensitive), inclusive. If none: lines before the first ``## ``
+    (exclusive), capped at 10 lines.
     """
     n = len(lines)
     for i, line in enumerate(lines):
@@ -143,19 +144,32 @@ def _write_styled_line(
     align: str,
     inner_width: float,
 ) -> None:
-    """Render one physical line of mixed bold/regular with left or center alignment."""
+    """Render one wrapped line without letting FPDF re-wrap mid-word."""
     total = _line_width_words(pdf, words_line, font_size, base_style)
     if align.upper() == "C":
         x0 = pdf.l_margin + max(0.0, (inner_width - total) / 2)
         pdf.set_x(x0)
+        for idx, (bold, word) in enumerate(words_line):
+            pdf.set_font("Helvetica", style="B" if bold else base_style, size=font_size)
+            if idx:
+                pdf.write(line_height, " ")
+            pdf.write(line_height, word)
+        pdf.ln(line_height)
+        return
     else:
         pdf.set_x(pdf.l_margin)
 
+    pdf.set_y(pdf.get_y())
     for idx, (bold, word) in enumerate(words_line):
         pdf.set_font("Helvetica", style="B" if bold else base_style, size=font_size)
+        word_w = pdf.get_string_width(word)
         if idx:
-            pdf.write(line_height, " ")
-        pdf.write(line_height, word)
+            pdf.set_font("Helvetica", style=base_style, size=font_size)
+            space_w = pdf.get_string_width(" ")
+            pdf.cell(space_w, line_height, "", new_x="RIGHT", new_y="TOP")
+            pdf.set_font("Helvetica", style="B" if bold else base_style, size=font_size)
+        # Use fixed-width cells so FPDF doesn't apply a second wrap pass.
+        pdf.cell(word_w, line_height, word, new_x="RIGHT", new_y="TOP")
     pdf.ln(line_height)
 
 
@@ -253,6 +267,7 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
     cleaned = _ats_clean(markdown_text)
     all_lines = cleaned.splitlines()
     header_lines, body_lines = _split_header_body(all_lines)
+    print(header_lines)
     inner_w = pdf.w - pdf.l_margin - pdf.r_margin
 
     header_name_boost_done = False

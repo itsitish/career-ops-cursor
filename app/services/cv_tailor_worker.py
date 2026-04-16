@@ -601,17 +601,24 @@ class CvTailorWorker:
 
         tasks_block = (
             "1. **Tailored CV (Markdown)** — Refactor for clarity and ATS fit:\n"
-            "   - Reorder and rewrite **experience bullets** so order and wording track the JD’s language and priority "
-            "(strongest matches first; mirror phrasing where truthful).\n"
+            "   - First, make a **keep / condense / remove** judgement for each role, project, and major bullet based "
+            "on the JD. Do **not** preserve the master CV structure by default.\n"
+            "   - Reorder and **materially rewrite** experience bullets so order and wording track the JD’s language "
+            "and priority (strongest matches first; mirror phrasing where truthful). Avoid cosmetic edits that keep the "
+            "same bullet substance and ordering.\n"
             "   - Reword the **headline / profile / summary** (if present) so it speaks directly to this role — "
             "using only facts from the master CV and KB.\n"
-            "   - **Omit or heavily condense** roles, projects, or bullets that are irrelevant to this JD; in the "
-            "**change log**, note honestly what was removed or shortened and why (no fabricated gaps or implied "
-            "employment holes).\n"
+            "   - For highly relevant roles, keep more detail and move the most JD-aligned bullets to the top.\n"
+            "   - For partially relevant roles, keep only the bullets that support this JD and compress the rest.\n"
+            "   - For weakly relevant or irrelevant roles / projects, reduce them to 0-2 short bullets, or remove "
+            "them entirely if chronology still reads cleanly.\n"
+            "   - **Omit or heavily condense** tools, projects, bullets, and older experience that do not help this "
+            "application; in the **change log**, note honestly what was removed or shortened and why (no fabricated "
+            "gaps or implied employment holes).\n"
             "   - Reorder sections and bullets so the **first screen** reflects the JD’s strongest must-haves.\n"
             "   - Rephrase bullets for impact (strong verbs, quantified facts **only** where already in the master).\n"
             "   - Mirror important JD keywords **where truthful**; use the evidence table — do not claim **none** rows.\n"
-            "   - Keep length comparable to the master unless the JD implies one page / short form.\n"
+            "   - Keep length comparable to the master unless a shorter, more targeted CV clearly improves fit.\n"
         )
         n = 2
         if cover_requested:
@@ -647,6 +654,14 @@ class CvTailorWorker:
             "- " + locale_line + "\n"
             "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
             "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
+            "- **Selection pressure:** treat the JD as the ranking function. If a bullet does not help this application, "
+            "rewrite it sharply, compress it, or remove it.\n"
+            "- **Experience pruning:** it is acceptable to shorten or drop low-value bullets and less relevant projects; "
+            "do not keep content just because it exists in the master CV.\n"
+            "- **Bullet rewriting:** prefer rewriting bullets around outcomes, scope, and role-relevant skills rather "
+            "than lightly paraphrasing the original sentence.\n"
+            "- **Failure mode to avoid:** do not return a near-copy of the master CV. The final draft should show real "
+            "prioritization, rewritten bullets, and visible pruning where the JD makes that appropriate.\n"
             "- **Markdown:** use `**bold**` sparingly in the tailored CV (e.g. a few role keywords); avoid wrapping "
             "whole paragraphs.\n"
             "- **No fabrication:** paraphrase and compress; never add employers, tools, or numbers not in the source.\n\n"
@@ -656,6 +671,8 @@ class CvTailorWorker:
             "- No fabricated achievements, numbers, or credentials.\n"
             "- If the JD requires something not evidenced in the master CV or highlights, "
             "document it only in the **change log** as a gap.\n"
+            "- Do not preserve every original bullet or project by default; remove or compress low-value content when "
+            "it improves JD fit.\n"
         )
 
     def _build_checklist(
@@ -673,6 +690,8 @@ class CvTailorWorker:
             "Confirm every stated tool, title, employer, and date appears in the master CV or KB highlights.",
             "Verify JD must-have requirements are either clearly evidenced or explicitly flagged as gaps.",
             "Check for accidental duplication or inflated seniority compared with the master CV.",
+            "Check that the experience bullets were materially rewritten for the JD, not just lightly paraphrased.",
+            "Check that weakly relevant bullets, projects, or older experience were shortened or removed where appropriate.",
         ]
         if cover_requested:
             items.extend(

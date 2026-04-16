@@ -36,11 +36,27 @@
       border-bottom: 1px solid var(--card-border);
     }
     .page-section:last-of-type { border-bottom: none; }
+    .page-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.35rem;
+    }
     .page-section > h2 {
       font-size: 1.15rem;
       margin: 0 0 0.35rem 0;
       color: #4a5f7a;
     }
+    .page-section-header > h2 { margin: 0; }
+    .section-toggle {
+      margin-top: 0;
+      min-width: 7.5rem;
+      font-size: 0.8rem;
+      padding: 0.28rem 0.65rem;
+      background: linear-gradient(180deg, #f6fbff 0%, #dcecf7 100%);
+    }
+    .page-section-content[hidden] { display: none; }
     .section-help {
       color: var(--muted);
       font-size: 0.88rem;
@@ -99,6 +115,26 @@
       border-radius: 8px;
     }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; }
+    .pdf-stack {
+      display: block;
+      margin-top: 0;
+      max-width: 42rem;
+    }
+    .pdf-stack > .card { margin-bottom: 1rem; }
+    .pdf-stack > .card:last-child { margin-bottom: 0; }
+    #section-cv-cover .card,
+    #section-cv-cover .pdf-stack,
+    #section-cv-cover .tailor-out,
+    #section-cv-cover .api-out,
+    #section-cv-cover .page-section-content {
+      max-width: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #section-cv-cover textarea,
+    #section-cv-cover input[type="text"] {
+      max-width: none;
+    }
     .muted { color: var(--muted); font-size: 0.8rem; }
     .config-banner {
       background: var(--card);
@@ -299,7 +335,7 @@
     <pre class="tailor-out" id="tailor-cover-out">{{ latest_tailored_cover or 'Paste Cursor response above to populate this panel.' }}</pre>
     <h3 style="margin-top: 1rem;">Export PDF</h3>
     <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code>.</p>
-    <div class="grid" style="margin-top: 0;">
+    <div class="pdf-stack">
       <section class="card">
         <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #4a5f7a;">CV only</h4>
         <form id="form-pdf-cv">
@@ -429,6 +465,54 @@
     const kbViewPre = document.getElementById('kb-view-pre');
     const kbViewMeta = document.getElementById('kb-view-meta');
     const kbViewTitle = document.getElementById('kb-view-title');
+
+    /**
+     * Make each top-level dashboard section collapsible and persist its state.
+     */
+    function initCollapsibleSections() {
+      const sections = document.querySelectorAll('.page-section');
+      for (const section of sections) {
+        const heading = section.querySelector(':scope > h2');
+        if (!heading || !section.id) continue;
+
+        const storageKey = 'career-ops-section:' + section.id;
+        const header = document.createElement('div');
+        header.className = 'page-section-header';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'section-toggle';
+
+        const content = document.createElement('div');
+        content.className = 'page-section-content';
+        content.id = section.id + '-content';
+
+        section.insertBefore(header, heading);
+        header.appendChild(heading);
+        header.appendChild(toggleBtn);
+
+        while (header.nextSibling) {
+          content.appendChild(header.nextSibling);
+        }
+        section.appendChild(content);
+
+        function applyCollapsedState(collapsed) {
+          content.hidden = collapsed;
+          toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          toggleBtn.setAttribute('aria-controls', content.id);
+          toggleBtn.textContent = collapsed ? 'Expand section' : 'Collapse section';
+        }
+
+        applyCollapsedState(true);
+
+        toggleBtn.addEventListener('click', () => {
+          const collapsed = !content.hidden;
+          applyCollapsedState(collapsed);
+        });
+      }
+    }
+
+    initCollapsibleSections();
 
     /** Escape text for safe insertion into HTML when building table rows from JSON. */
     function escapeHtml(s) {

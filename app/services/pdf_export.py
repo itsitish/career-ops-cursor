@@ -16,6 +16,10 @@ from fpdf import FPDF
 
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "output" / "resumes"
+BODY_TEXT_COLOR = (25, 25, 25)
+MUTED_TEXT_COLOR = (82, 82, 82)
+HEADING_TEXT_COLOR = (68, 109, 170)
+DIVIDER_COLOR = (207, 221, 239)
 
 
 def _ats_clean(markdown_text: str) -> str:
@@ -47,6 +51,29 @@ def _looks_like_name(line: str) -> bool:
     if "http" in s.lower():
         return False
     return len(s) <= 50
+
+
+def _looks_like_contact_line(line: str) -> bool:
+    """Return True for short contact/meta lines in the centered header."""
+    s = line.strip().lower()
+    if not s:
+        return False
+    if any(token in s for token in ("linkedin", "github", "http", "@")):
+        return True
+    return s.count("·") >= 1
+
+
+def _set_text_color(pdf: FPDF, rgb: tuple[int, int, int]) -> None:
+    """Apply an RGB text color."""
+    pdf.set_text_color(*rgb)
+
+
+def _draw_divider(pdf: FPDF) -> None:
+    """Draw a light horizontal divider across the writable width."""
+    y = pdf.get_y()
+    pdf.set_draw_color(*DIVIDER_COLOR)
+    pdf.set_line_width(0.35)
+    pdf.line(pdf.l_margin, y, pdf.w - pdf.r_margin, y)
 
 
 def _split_header_body(lines: list[str]) -> tuple[list[str], list[str]]:
@@ -212,6 +239,7 @@ def _render_heading(
     size = {1: 14, 2: 12, 3: 11}[level]
     line_h = {1: 7.0, 2: 6.5, 3: 6.0}[level]
     pdf.set_font("Helvetica", style="B", size=size)
+    _set_text_color(pdf, HEADING_TEXT_COLOR if level <= 2 else BODY_TEXT_COLOR)
     # Plain headings: multi_cell (C in header). Inline ``**`` uses write-based flow.
     if "**" not in text:
         pdf.multi_cell(
@@ -232,6 +260,7 @@ def _render_heading(
             align="C" if centered else "L",
             inner_width=inner_width,
         )
+    _set_text_color(pdf, BODY_TEXT_COLOR)
     pdf.set_font("Helvetica", size=10)
 
 
@@ -263,11 +292,11 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
     pdf.set_font("Helvetica", size=10)
+    _set_text_color(pdf, BODY_TEXT_COLOR)
 
     cleaned = _ats_clean(markdown_text)
     all_lines = cleaned.splitlines()
     header_lines, body_lines = _split_header_body(all_lines)
-    print(header_lines)
     inner_w = pdf.w - pdf.l_margin - pdf.r_margin
 
     header_name_boost_done = False
@@ -283,6 +312,10 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
         if not header_name_boost_done and _looks_like_name(line):
             fs = 12
             header_name_boost_done = True
+        _set_text_color(
+            pdf,
+            MUTED_TEXT_COLOR if _looks_like_contact_line(line) else BODY_TEXT_COLOR,
+        )
         _render_mixed_markdown_line(
             pdf,
             line,
@@ -292,9 +325,12 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
             align="C",
             inner_width=inner_w,
         )
+    _set_text_color(pdf, BODY_TEXT_COLOR)
 
     if header_lines and body_lines:
-        pdf.ln(2)
+        pdf.ln(1)
+        _draw_divider(pdf)
+        pdf.ln(3)
 
     for raw in body_lines:
         line = raw.rstrip()

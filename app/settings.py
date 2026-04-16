@@ -32,6 +32,7 @@ class AppSettings:
 
 
 def _as_str_list(val: Any) -> List[str]:
+    """Normalize a scalar/list YAML value into a trimmed string list."""
     if val is None:
         return []
     if isinstance(val, str) and val.strip():
@@ -42,6 +43,7 @@ def _as_str_list(val: Any) -> List[str]:
 
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
+    """Best-effort YAML loader that returns an empty mapping on missing/invalid files."""
     if not path.is_file():
         return {}
     try:
@@ -67,6 +69,8 @@ def load_settings(project_root: Path) -> AppSettings:
     target_roles: List[str] = []
     tr = data.get("target_roles")
     if isinstance(tr, dict):
+        # Support both the newer structured shape and the older flat list shape so
+        # existing user profiles continue to work without migration.
         target_roles.extend(_as_str_list(tr.get("primary")))
         arch = tr.get("archetypes")
         if isinstance(arch, list):

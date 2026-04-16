@@ -30,14 +30,17 @@ class MockWorker:
         self._delay_s = delay_s
 
     def can_handle(self, task_type: str) -> bool:
+        """Return True when the demo worker owns this synthetic task type."""
         return task_type == self._task_type
 
     def process(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Sleep briefly and echo the payload to simulate a completed worker task."""
         time.sleep(self._delay_s)
         return {"worker_id": self.worker_id, "echo": task.get("payload"), "task_id": task.get("task_id")}
 
 
 def main() -> None:
+    """Register demo workers, enqueue tasks, print snapshots, then shut down."""
     monitor = MonitorAgent()
     monitor.register_worker(MockWorker("w-alpha", "alpha", delay_s=0.2))
     monitor.register_worker(MockWorker("w-beta", "beta", delay_s=0.25))

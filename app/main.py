@@ -104,6 +104,8 @@ def wait_for_task_terminal(
     """
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
+        # Routes use this helper for short-lived worker jobs and intentionally read the
+        # monitor's private registry so they can stay synchronous from the UI's perspective.
         with monitor._lock:
             rec = monitor._tasks.get(task_id)
             if rec is not None and rec.status in (
@@ -235,6 +237,7 @@ def filter_kb_highlights_vs_master_cv(highlights: List[str], master_cv: str) -> 
         if not raw:
             return True
         norm_h = " ".join(raw.split()).casefold()
+        # Long exact-ish snippets are almost always copy/pastes from the uploaded master CV.
         if len(norm_h) >= 28 and norm_h in master_norm:
             return True
         th = _kb_overlap_tokens(raw)
@@ -242,6 +245,8 @@ def filter_kb_highlights_vs_master_cv(highlights: List[str], master_cv: str) -> 
             return False
         if not line_token_sets:
             return False
+        # 72% overlap is a conservative threshold: trim obvious restatements while keeping
+        # short, high-signal KB notes that extend a role with extra context.
         best = max(len(th & lt) / len(th) for lt in line_token_sets)
         return best >= 0.72
 

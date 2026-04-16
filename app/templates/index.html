@@ -467,6 +467,25 @@
     const kbViewTitle = document.getElementById('kb-view-title');
 
     /**
+     * Reorder top-level sections for a faster application workflow.
+     */
+    function reorderSections() {
+      const body = document.body;
+      const sectionJob = document.getElementById('section-job-analysis');
+      const sectionCv = document.getElementById('section-cv-cover');
+      const sectionKb = document.getElementById('section-knowledge-base');
+      const sectionApps = document.getElementById('section-applications');
+      const sectionOps = document.getElementById('section-operations');
+      if (!body || !sectionJob || !sectionCv || !sectionKb) return;
+
+      const ordered = [sectionJob, sectionCv, sectionKb, sectionApps, sectionOps]
+        .filter(Boolean);
+      for (const section of ordered) {
+        body.appendChild(section);
+      }
+    }
+
+    /**
      * Make each top-level dashboard section collapsible and persist its state.
      */
     function initCollapsibleSections() {
@@ -512,6 +531,7 @@
       }
     }
 
+    reorderSections();
     initCollapsibleSections();
 
     /** Escape text for safe insertion into HTML when building table rows from JSON. */

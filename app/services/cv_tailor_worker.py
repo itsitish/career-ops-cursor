@@ -97,6 +97,7 @@ def _word_count(text: str) -> int:
 
 
 def _is_bullet_line(line: str) -> bool:
+    """True when a line starts with a Markdown-style bullet marker."""
     return bool(re.match(r"^\s*[-*•]\s+\S", line))
 
 
@@ -139,6 +140,7 @@ def _split_preamble_and_sections(lines: List[str]) -> Tuple[List[str], List[Tupl
 
 
 def _is_experience_header(header: str) -> bool:
+    """Return True for section headings that represent work-history content."""
     h = header.lower()
     return any(
         k in h
@@ -331,6 +333,7 @@ def _split_sentences(text: str) -> List[str]:
 
 
 def _sentence_jd_score(sentence: str, jd_kw: set[str]) -> int:
+    """Sentence-level alias of bullet scoring for cover-letter sentence ranking."""
     return _bullet_jd_score(sentence, jd_kw)
 
 
@@ -384,6 +387,8 @@ def _build_tailored_cover_markdown(
     jd_kw = _jd_keyword_tokens(jd_text)
     candidates: List[Tuple[int, str]] = []
 
+    # Rank short factual snippets first so the cover letter starts from the most
+    # JD-aligned evidence before falling back to verbatim padding from the master CV.
     for h in kb_highlights:
         for sent in _split_sentences(h):
             candidates.append((_sentence_jd_score(sent, jd_kw), sent))
@@ -448,7 +453,8 @@ def _build_tailored_cover_markdown(
             if total_wc(" ".join(body_sents)) >= low_w:
                 break
 
-    # Very short CVs: append the same verbatim body blob until we approach ``low_w``.
+    # Very short CVs: append a verbatim CV blob until we approach ``low_w`` without
+    # inventing any filler content outside the user's materials.
     blob_pad = " ".join(
         s.strip()
         for s in master_cv.splitlines()
@@ -618,6 +624,10 @@ class CvTailorWorker:
             "   - Reorder sections and bullets so the **first screen** reflects the JD’s strongest must-haves.\n"
             "   - Rephrase bullets for impact (strong verbs, quantified facts **only** where already in the master).\n"
             "   - Mirror important JD keywords **where truthful**; use the evidence table — do not claim **none** rows.\n"
+            "   - Avoid repeating the same phrases across the headline, summary, Core Skills, and experience bullets; "
+            "vary wording while keeping the meaning accurate.\n"
+            "   - In **Core Skills**, format each category label in bold, e.g. `**ML & Statistical Methods:**`.\n"
+            "   - Throughout the CV, bold important JD-aligned keywords, tools, and capability phrases for scanability.\n"
             "   - Keep length comparable to the master unless a shorter, more targeted CV clearly improves fit.\n"
         )
         n = 2
@@ -660,10 +670,12 @@ class CvTailorWorker:
             "do not keep content just because it exists in the master CV.\n"
             "- **Bullet rewriting:** prefer rewriting bullets around outcomes, scope, and role-relevant skills rather "
             "than lightly paraphrasing the original sentence.\n"
+            "- **Repetition control:** do not reuse the same JD phrase or marketing line multiple times unless it is "
+            "genuinely necessary; spread related concepts across varied, natural wording.\n"
             "- **Failure mode to avoid:** do not return a near-copy of the master CV. The final draft should show real "
             "prioritization, rewritten bullets, and visible pruning where the JD makes that appropriate.\n"
-            "- **Markdown:** use `**bold**` sparingly in the tailored CV (e.g. a few role keywords); avoid wrapping "
-            "whole paragraphs.\n"
+            "- **Markdown:** use `**bold**` deliberately for Core Skills labels and important JD-aligned keywords "
+            "throughout the CV; keep bolding to short phrases, not whole bullets or paragraphs.\n"
             "- **No fabrication:** paraphrase and compress; never add employers, tools, or numbers not in the source.\n\n"
             "## Tasks\n"
             f"{tasks_block}\n"

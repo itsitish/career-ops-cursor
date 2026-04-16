@@ -503,46 +503,61 @@ class Storage:
         return job_insert(**kwargs, db_path=self.db_path)
 
     def job_get_by_id(self, job_id: int) -> Optional[dict[str, Any]]:
+        """Return one job row using the facade's configured ``db_path``."""
         return job_get_by_id(job_id, db_path=self.db_path)
 
     def job_get_by_link(self, link: str) -> Optional[dict[str, Any]]:
+        """Return the job row matching ``link`` using the facade's ``db_path``."""
         return job_get_by_link(link, db_path=self.db_path)
 
     def job_list(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """List jobs via the facade's configured database path."""
         return job_list(**kwargs, db_path=self.db_path)
 
     def job_update(self, job_id: int, **kwargs: Any) -> bool:
+        """Update one job row using the facade's configured ``db_path``."""
         return job_update(job_id, **kwargs, db_path=self.db_path)
 
     def job_delete(self, job_id: int) -> bool:
+        """Delete one job row using the facade's configured ``db_path``."""
         return job_delete(job_id, db_path=self.db_path)
 
     def application_insert(self, **kwargs: Any) -> int:
+        """Insert an application row using the facade's configured ``db_path``."""
         return application_insert(**kwargs, db_path=self.db_path)
 
     def application_get_by_id(self, application_id: int) -> Optional[dict[str, Any]]:
+        """Return one application row using the facade's configured ``db_path``."""
         return application_get_by_id(application_id, db_path=self.db_path)
 
     def application_list(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """List applications via the facade's configured database path."""
         return application_list(**kwargs, db_path=self.db_path)
 
     def application_update(self, application_id: int, **kwargs: Any) -> bool:
+        """Update one application row using the facade's configured ``db_path``."""
         return application_update(application_id, **kwargs, db_path=self.db_path)
 
     def application_delete(self, application_id: int) -> bool:
+        """Delete one application row using the facade's configured ``db_path``."""
         return application_delete(application_id, db_path=self.db_path)
 
     def kb_insert(self, **kwargs: Any) -> int:
+        """Insert one KB row using the facade's configured ``db_path``."""
         return kb_insert(**kwargs, db_path=self.db_path)
 
     def kb_get_by_id(self, entry_id: int) -> Optional[dict[str, Any]]:
+        """Return one KB row using the facade's configured ``db_path``."""
         return kb_get_by_id(entry_id, db_path=self.db_path)
 
     def kb_list(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """List KB rows via the facade's configured database path."""
         return kb_list(**kwargs, db_path=self.db_path)
 
     def kb_update(self, entry_id: int, **kwargs: Any) -> bool:
+        """Update one KB row using the facade's configured ``db_path``."""
         return kb_update(entry_id, **kwargs, db_path=self.db_path)
 
     def kb_delete(self, entry_id: int) -> bool:
+        """Delete one KB row using the facade's configured ``db_path``."""
         return kb_delete(entry_id, db_path=self.db_path)

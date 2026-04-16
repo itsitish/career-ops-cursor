@@ -89,7 +89,7 @@ def _run_scrape_and_store() -> dict[str, Any]:
         "inserted": inserted,
         "skipped_duplicate_link": skipped_dup,
         "errors": err_count,
-        "min_salary_gbp": result.get("min_salary_gbp", _MIN_SALARY_GBP),
+        "min_salary_gbp": result.get("min_salary_gbp", settings.min_salary_gbp),
     }
     return summary
 
@@ -116,6 +116,7 @@ def scheduled_job() -> None:
 
 def main() -> None:
     """Start BlockingScheduler: daily cron at 08:30 local time."""
+    settings = load_settings(_ROOT)
     scheduler = BlockingScheduler()
     scheduler.add_job(
         scheduled_job,
@@ -127,7 +128,7 @@ def main() -> None:
     )
     print(
         "Scheduler running: daily scrape at 08:30 local time "
-        f"(config={_CONFIG_PATH}, min_salary_gbp={_MIN_SALARY_GBP})"
+        f"(config={_CONFIG_PATH}, min_salary_gbp={settings.min_salary_gbp})"
     )
     scheduler.start()
 

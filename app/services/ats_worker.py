@@ -93,6 +93,9 @@ def _keyword_overlap(
     """
     Classify JD keywords as matched if they appear in role vocab or as substrings
     of role tokens (handles e.g. 'react' vs 'reactjs').
+
+    This is intentionally fuzzy because profile target roles are short and often omit
+    exact JD wording, but they still signal adjacent role families.
     """
     matched: List[str] = []
     missing: List[str] = []
@@ -183,7 +186,7 @@ def _salary_assessment(required_gbp: int, jd_norm: str) -> tuple[int, List[str]]
 
     max_v = max(values)
 
-    # Pass if any stated figure or band top meets/exceeds requirement
+    # Pass if any stated figure or band top meets/exceeds requirement.
     if max_v >= required_gbp:
         return 0, reasons
 
@@ -192,6 +195,8 @@ def _salary_assessment(required_gbp: int, jd_norm: str) -> tuple[int, List[str]]
         f"Stated compensation appears below required £{required_gbp:,} "
         f"(max parsed ~£{max_v:,})."
     )
+    # Penalize larger gaps more heavily, but cap the salary signal so it never fully
+    # dominates keyword fit or the hard-reject sponsorship rules.
     penalty = min(35, 10 + gap // 5000)
     return -penalty, reasons
 

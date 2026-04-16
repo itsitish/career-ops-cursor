@@ -1,5 +1,5 @@
 # Copy to config/profile.yml and customize (profile.yml is gitignored by default).
-# Used for JD scoring defaults, scrape salary floor, and text injected into Cursor tailor prompts.
+# Used for JD scoring defaults, scrape salary floor, and app-level tailoring defaults.
 
 candidate:
   headline: "Your one-line professional headline (optional)"
@@ -23,7 +23,7 @@ compensation:
   minimum_gbp: 60000
 
 location:
-  # Shown inside the Cursor prompt so the model knows your visa/sponsorship context.
+  # Stored for your own records / app defaults; not injected into the generated tailor prompt.
   visa_sponsorship_note: "e.g. I require Skilled Worker sponsorship (UK)."
 
 locale: en-GB

@@ -141,15 +141,19 @@ class MonitorAgent:
     # --- internal ---
 
     def _pick_worker(self, task_type: str) -> Optional[Any]:
+        """Return the first worker that claims the task type, skipping unhealthy workers."""
         for w in self._workers:
             try:
                 if w.can_handle(task_type):
                     return w
             except Exception:
+                # Worker capability checks are treated as advisory so one bad worker
+                # cannot stop the whole monitor from routing tasks to others.
                 continue
         return None
 
     def _dispatcher_loop(self) -> None:
+        """Consume queued task ids, reserve a worker, and spawn the task thread."""
         while not self._stop.is_set():
             try:
                 item = self._task_queue.get(timeout=0.25)
@@ -170,7 +174,8 @@ class MonitorAgent:
                     record.finished_at = time.time()
                     record.error = f"no worker for task type {task_type!r}"
                     continue
-                # mark running and reserve worker
+                # Reserve the worker while still under the lock so snapshots never show
+                # one task as running on multiple workers or one worker serving two tasks.
                 record.status = TaskStatus.RUNNING
                 record.started_at = time.time()
                 record.worker_id = worker.worker_id
@@ -192,6 +197,7 @@ class MonitorAgent:
         task: Dict[str, Any],
         worker_id: str,
     ) -> None:
+        """Execute one task boundary and persist success/failure back to the registry."""
         try:
             payload = dict(task)
             payload.setdefault("task_id", task_id)

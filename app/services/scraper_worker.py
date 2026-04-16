@@ -124,6 +124,7 @@ def _clean_text(el: Any, max_len: int = 8000) -> str:
 
 
 def _class_str(classes: Any) -> str:
+    """Normalize BeautifulSoup ``class`` values to a single comparable string."""
     if classes is None:
         return ""
     if isinstance(classes, str):
@@ -194,7 +195,8 @@ def _extract_cards(soup: BeautifulSoup, page_url: str = "") -> list[Any]:
             seen_ids.add(tid)
             out.append(tag)
 
-    # LinkedIn job search: server-rendered list items (classes change; match loosely).
+    # LinkedIn uses unstable class names, so try the most specific selectors first and
+    # fall back to broader card-like fragments before giving up to generic extraction.
     if _is_linkedin_jobs_url(page_url):
         for sel in (
             "li.jobs-search-results__list-item",
@@ -214,7 +216,7 @@ def _extract_cards(soup: BeautifulSoup, page_url: str = "") -> list[Any]:
     for tag in soup.find_all(_is_probably_job_container):
         add(tag)
 
-    # Generic fallback: any prominent job-board link blocks
+    # Generic fallback: any prominent job-board link blocks.
     if not out:
         for a in soup.find_all("a", href=True):
             try:

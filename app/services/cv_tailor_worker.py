@@ -661,7 +661,6 @@ class CvTailorWorker:
             "## Knowledge-base highlights (trusted facts / themes)\n"
             f"{kb_block}\n\n"
             "## Rewriting guidance\n"
-            "- " + locale_line + "\n"
             "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
             "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
             "- **Selection pressure:** treat the JD as the ranking function. If a bullet does not help this application, "

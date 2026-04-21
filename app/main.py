@@ -675,6 +675,35 @@ async def api_applications_add(payload: Dict[str, Any] = Body(...)) -> JSONRespo
     return JSONResponse({"ok": True, "id": app_id})
 
 
+@app.patch("/api/applications/{application_id}")
+async def api_applications_update(
+    application_id: int, payload: Dict[str, Any] = Body(...)
+) -> JSONResponse:
+    """Update mutable fields on an application row (status, notes, etc.).
+
+    Only fields explicitly present in the payload are updated; everything else
+    is left untouched. Empty strings are coerced to None so the column is
+    cleared rather than holding an empty string.
+    """
+    allowed = (
+        "company", "role", "link", "date_applied",
+        "status", "cv_version", "cover_version", "notes",
+    )
+    updates: Dict[str, Any] = {}
+    for key in allowed:
+        if key in payload:
+            val = payload[key]
+            if isinstance(val, str) and val.strip() == "":
+                val = None
+            updates[key] = val
+    if not updates:
+        raise HTTPException(status_code=400, detail="no updatable fields supplied")
+    if not storage.application_update(application_id, **updates):
+        raise HTTPException(status_code=404, detail="application not found or no change")
+    row = storage.application_get_by_id(application_id)
+    return JSONResponse({"ok": True, "id": application_id, "application": row})
+
+
 @app.delete("/api/jobs/{job_id}")
 async def api_jobs_delete(job_id: int) -> JSONResponse:
     """Delete one job listing row by id (scraped jobs board)."""

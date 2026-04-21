@@ -1,12 +1,62 @@
-# Placeholder URLs — replace with your own searches and company boards.
+# Real sources for UK-focused MLOps / ML / Data Scientist / Python roles.
+# Mix of broad UK job-search engines and aggregated Greenhouse / LinkedIn search URLs.
+# LinkedIn results may still be sparse because of login / JS walls.
 urls:
-  # LinkedIn job search (example query + UK)
-  - "https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=United%20Kingdom"
-  # Indeed UK search
-  - "https://uk.indeed.com/jobs?q=software+engineer&l=London"
-  # Glassdoor UK search
-  - "https://www.glassdoor.co.uk/Job/london-software-engineer-jobs-SRCH_IL.0,6_IC2671300_KO7,25.htm"
-  # Greenhouse board (sample company slug — change to a real board)
-  - "https://boards.greenhouse.io/examplecompany/jobs"
-  # Generic company careers listing (replace with a real careers page)
-  - "https://www.example.com/careers/jobs"
+  # Indeed UK
+  - "https://uk.indeed.com/jobs?q=machine+learning+engineer&l=United+Kingdom"
+  - "https://uk.indeed.com/jobs?q=mlops+engineer&l=United+Kingdom"
+  - "https://uk.indeed.com/jobs?q=data+scientist&l=United+Kingdom"
+  - "https://uk.indeed.com/jobs?q=ai+engineer&l=United+Kingdom"
+  - "https://uk.indeed.com/jobs?q=senior+python+engineer&l=United+Kingdom"
+
+  # LinkedIn (UK)
+  - "https://www.linkedin.com/jobs/search/?keywords=machine%20learning%20engineer&location=United%20Kingdom"
+  - "https://www.linkedin.com/jobs/search/?keywords=mlops%20engineer&location=United%20Kingdom"
+  - "https://www.linkedin.com/jobs/search/?keywords=data%20scientist&location=United%20Kingdom"
+  - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&location=United%20Kingdom"
+  - "https://www.linkedin.com/jobs/search/?keywords=senior%20python%20engineer&location=United%20Kingdom"
+
+  # Greenhouse aggregated search (location filter is best-effort on Greenhouse)
+  - "https://boards.greenhouse.io/jobs?q=machine+learning+engineer&location=United+Kingdom"
+  - "https://boards.greenhouse.io/jobs?q=mlops+engineer&location=United+Kingdom"
+  - "https://boards.greenhouse.io/jobs?q=data+scientist&location=United+Kingdom"
+  - "https://boards.greenhouse.io/jobs?q=ai+engineer&location=United+Kingdom"
+  - "https://boards.greenhouse.io/jobs?q=senior+python+engineer&location=United+Kingdom"
+
+  # Reed.co.uk (UK-only board)
+  - "https://www.reed.co.uk/jobs/machine-learning-engineer-jobs"
+  - "https://www.reed.co.uk/jobs/mlops-engineer-jobs"
+  - "https://www.reed.co.uk/jobs/data-scientist-jobs"
+  - "https://www.reed.co.uk/jobs/ai-engineer-jobs"
+  - "https://www.reed.co.uk/jobs/python-engineer-jobs"
+
+  # CWJobs (UK tech-focused)
+  - "https://www.cwjobs.co.uk/jobs/machine-learning-engineer/in-uk"
+  - "https://www.cwjobs.co.uk/jobs/mlops/in-uk"
+  - "https://www.cwjobs.co.uk/jobs/data-scientist/in-uk"
+  - "https://www.cwjobs.co.uk/jobs/ai-engineer/in-uk"
+  - "https://www.cwjobs.co.uk/jobs/python/in-uk"
+
+  # Totaljobs (UK)
+  - "https://www.totaljobs.com/jobs/machine-learning-engineer/in-uk"
+  - "https://www.totaljobs.com/jobs/mlops/in-uk"
+  - "https://www.totaljobs.com/jobs/data-scientist/in-uk"
+  - "https://www.totaljobs.com/jobs/ai-engineer/in-uk"
+  - "https://www.totaljobs.com/jobs/python/in-uk"
+
+  # Adzuna UK
+  - "https://www.adzuna.co.uk/search?q=machine+learning+engineer&loc=87490"
+  - "https://www.adzuna.co.uk/search?q=mlops+engineer&loc=87490"
+  - "https://www.adzuna.co.uk/search?q=data+scientist&loc=87490"
+  - "https://www.adzuna.co.uk/search?q=ai+engineer&loc=87490"
+  - "https://www.adzuna.co.uk/search?q=senior+python+engineer&loc=87490"
+
+  # Wellfound (formerly AngelList) - startup-heavy
+  - "https://wellfound.com/role/l/machine-learning-engineer/united-kingdom"
+  - "https://wellfound.com/role/l/data-scientist/united-kingdom"
+  - "https://wellfound.com/role/l/python-developer/united-kingdom"
+
+  # Otta / Welcome to the Jungle (UK tech & startups)
+  - "https://app.welcometothejungle.com/jobs?query=machine%20learning&refinementList%5Boffices.country_code%5D%5B%5D=GB"
+  - "https://app.welcometothejungle.com/jobs?query=data%20scientist&refinementList%5Boffices.country_code%5D%5B%5D=GB"
+  - "https://app.welcometothejungle.com/jobs?query=python&refinementList%5Boffices.country_code%5D%5B%5D=GB"

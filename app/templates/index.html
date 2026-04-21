@@ -401,23 +401,42 @@
     </table>
     </div>
     <h3 style="margin-top: 1.25rem;">Recent applications</h3>
+    <p class="muted" style="margin: 0 0 0.5rem 0;">
+      Change the status dropdown then click <strong>Save</strong> to <code>PATCH /api/applications/{id}</code>.
+    </p>
+    {# Status options shared by every row's dropdown. Edit list to suit your pipeline. #}
+    {% set _status_options = ['applied', 'in_review', 'phone_screen', 'interview', 'offer', 'rejected', 'withdrawn'] %}
     <table>
       <thead>
         <tr>
-          <th>ID</th><th>Company</th><th>Role</th><th>Applied</th><th>Status</th>
+          <th>ID</th><th>Company</th><th>Role</th><th>Applied</th><th>Status</th><th></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="apps-tbody">
         {% for a in applications %}
-        <tr>
+        <tr data-app-row="{{ a.id }}">
           <td>{{ a.id }}</td>
           <td>{{ a.company }}</td>
           <td>{{ a.role }}</td>
           <td>{{ a.date_applied }}</td>
-          <td>{{ a.status or '' }}</td>
+          <td>
+            <select class="app-status-select" data-app-status="{{ a.id }}">
+              <option value="">(none)</option>
+              {% for opt in _status_options %}
+              <option value="{{ opt }}" {% if (a.status or '')|lower == opt %}selected{% endif %}>{{ opt }}</option>
+              {% endfor %}
+              {# Preserve unknown legacy statuses so they're not silently dropped on save. #}
+              {% if a.status and (a.status|lower) not in _status_options %}
+              <option value="{{ a.status }}" selected>{{ a.status }}</option>
+              {% endif %}
+            </select>
+          </td>
+          <td>
+            <button type="button" class="btn-kb-view" data-save-app-status="{{ a.id }}">Save</button>
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="5">No applications yet.</td></tr>
+        <tr><td colspan="6">No applications yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -856,6 +875,35 @@
           }
         } catch (err) {
           showResponse(appApiOut, 'Delete failed: ' + String(err));
+        }
+      });
+    }
+
+    const appsTbody = document.getElementById('apps-tbody');
+    if (appsTbody) {
+      appsTbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-save-app-status]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-save-app-status');
+        const sel = appsTbody.querySelector('select[data-app-status="' + id + '"]');
+        if (!id || !sel) return;
+        const original = btn.textContent;
+        btn.textContent = 'Saving…';
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/applications/' + encodeURIComponent(id), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: sel.value || null }),
+          });
+          const txt = await res.text();
+          showResponse(appApiOut, formatResponse(res, txt));
+          btn.textContent = res.ok ? 'Saved' : 'Failed';
+        } catch (err) {
+          showResponse(appApiOut, 'Update failed: ' + String(err));
+          btn.textContent = 'Failed';
+        } finally {
+          setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
         }
       });
     }

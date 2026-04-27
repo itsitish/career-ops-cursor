@@ -110,16 +110,14 @@ def keyword_evidence_table_md(
 
 
 def infer_locale_instruction(jd_text: str, locale_hint: str) -> str:
-    """Short line telling the model which spelling to prefer."""
-    jd_low = jd_text.lower()
-    uk_signals = ("£", "gbp", "united kingdom", " uk ", "london", "leeds", "manchester")
-    us_signals = ("$", "usd", "united states", "remote us", "sf ", "ny ")
-    if any(s in jd_low for s in uk_signals):
-        return "Use British English spelling and date formats."
-    if any(s in jd_low for s in us_signals):
-        return "Use US English spelling unless the CV is clearly UK-oriented."
-    if locale_hint.lower().startswith("en-gb"):
-        return "Default to British English (profile locale en-GB)."
-    if locale_hint.lower().startswith("en-us"):
-        return "Default to US English (profile locale en-US)."
-    return "Match the JD's locale/spelling where obvious; otherwise keep the master CV's variety."
+    """
+    Short line telling the model to use British English in all tailored output.
+
+    ``jd_text`` and ``locale_hint`` are kept for call-site compatibility; spelling
+    policy is always British English in line with the career-ops product default.
+    """
+    _ = jd_text, locale_hint
+    return (
+        "Use British English throughout (e.g. organise, colour, centre, programme when meaning course). "
+        "Use UK date forms in prose where relevant (e.g. April 2026). Do not use US spellings in running text."
+    )

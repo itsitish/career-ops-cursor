@@ -482,7 +482,7 @@ class CvTailorWorker:
     """
     Produces ``prompt_markdown``, ``checklist``, and locally tailored Markdown documents.
 
-    No external API calls; same inputs → same outputs.
+    No external API calls; same inputs produce the same outputs.
     """
 
     worker_id: str = "cv_tailor_worker"
@@ -761,13 +761,18 @@ class CvTailorWorker:
             + "## JD signals (deterministic extract)\n"
             + "### Lines likely tied to requirements / responsibilities\n"
             + f"{must_block}\n\n"
-            + "### Keyword ↔ evidence (master CV + KB)\n"
+            + "### Keyword to evidence (master CV + KB)\n"
             + "Use this to prioritize wording and to flag honest gaps.\n\n"
             + f"{evidence_table}\n\n"
             + master_section
             + kb_section
             + "## Rewriting guidance\n"
-            + "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
+            + f"- **Spelling:** {locale_line}\n"
+            + "- **Plain text in output:** do not use Unicode arrow characters or non-Markdown symbols; use the word "
+            '"to", a comma, or a hyphen. Standard Markdown only: `**bold**`, `##` headings, `-` list markers.\n'
+            + "- **Education:** keep each degree and any \"Focus: ...\" or module list as plain text. Do not use "
+            "single-asterisk `*...*` italics around the word Focus or around module names; write e.g. "
+            "`Focus: Statistical Modelling, Deep Learning` on its own line without italics.\n"
             + "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
             + "- **Selection pressure:** treat the JD as the ranking function. If a bullet does not help this application, "
             "rewrite it sharply, compress it, or remove it.\n"
@@ -805,6 +810,7 @@ class CvTailorWorker:
         has_kb = bool(kb_highlights)
 
         items: List[str] = [
+            "Confirm British English spelling and vocabulary in the CV and (if present) cover letter.",
             "Confirm every stated tool, title, employer, and date appears in the master CV or KB highlights.",
             "Verify JD must-have requirements are either clearly evidenced or explicitly flagged as gaps.",
             "Check for accidental duplication or inflated seniority compared with the master CV.",

@@ -108,6 +108,25 @@
       border-color: #9eb8d4;
       font-weight: 600;
     }
+    .scroll-top-btn {
+      position: fixed;
+      right: 1.1rem;
+      bottom: 1.1rem;
+      z-index: 10000;
+      width: 2.7rem;
+      height: 2.7rem;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--card-border);
+      background: var(--surface);
+      color: #3d4d60;
+      font-size: 1.15rem;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(30, 50, 90, 0.15);
+    }
+    .scroll-top-btn:hover { filter: brightness(1.04); }
+    .scroll-top-btn[hidden] { display: none !important; }
     .dashboard-main {
       flex: 1;
       min-width: 0;
@@ -502,7 +521,7 @@
     <div class="tailor-out tailor-md-preview" id="tailor-cover-out">{% if latest_tailored_cover_html|default('', true) %}{{ latest_tailored_cover_html|safe }}{% else %}<p class="muted">Paste Cursor response above to populate this panel.</p>{% endif %}</div>
     <textarea id="tailor-cover-raw" hidden aria-hidden="true" tabindex="-1" readonly>{{ latest_tailored_cover }}</textarea>
     <h3 style="margin-top: 1rem;">Export PDF</h3>
-    <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code> (CV → <code>output/resumes</code>, cover → <code>output/covers</code>).</p>
+    <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code> (CV to <code>output/resumes</code>, cover to <code>output/covers</code>).</p>
     <div class="pdf-stack">
       <section class="card">
         <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #4a5f7a;">CV only</h4>
@@ -649,6 +668,8 @@
     <pre id="kb-view-pre" style="white-space: pre-wrap; max-height: 65vh; overflow: auto; margin: 0; font-size: 0.9rem;"></pre>
   </dialog>
 
+  <button type="button" class="scroll-top-btn" id="scroll-top-btn" title="Back to top" hidden aria-label="Back to top">^</button>
+
   <script>
     const kbApiOut = document.getElementById('kb-api-out');
     const jobApiOut = document.getElementById('job-api-out');
@@ -675,7 +696,7 @@
     const kbViewTitle = document.getElementById('kb-view-title');
 
     /**
-     * Order section panels inside ``#dashboard-panels`` (job → CV → KB → operations).
+     * Order section panels inside #dashboard-panels (job, then CV, then KB, then operations).
      */
     function reorderSections() {
       const panels = document.getElementById('dashboard-panels');
@@ -1232,6 +1253,20 @@
         }
       });
     }
+
+    (function initScrollTop() {
+      const btn = document.getElementById('scroll-top-btn');
+      if (!btn) return;
+      function sync() {
+        if (window.scrollY > 280) btn.removeAttribute('hidden');
+        else btn.setAttribute('hidden', '');
+      }
+      window.addEventListener('scroll', sync, { passive: true });
+      sync();
+      btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    })();
   </script>
 </body>
 </html>

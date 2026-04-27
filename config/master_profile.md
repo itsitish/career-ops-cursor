@@ -14,10 +14,10 @@ linkedin.com/in/itish-singh-09853733 · https://github.com/itsitish
 
 ## Education
 
-- MSc - Data Science and Analytics, University of Leeds			    Sep 2021 - Sep 2022
+- MSc, Data Science and Analytics, University of Leeds, Sep 2021 - Sep 2022
 Focus: Statistical Modelling, Deep Learning, NLP, Time-series forecasting
 
-- B.Tech - Computer Science, Galgotias University				   May 2015 - May 2019
+- B.Tech, Computer Science, Galgotias University, May 2015 - May 2019
 Focus: Python, SQL, MongoDB, Data Structures
 
 
@@ -51,7 +51,7 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Wrote complex SQL queries to aggregate, validate, and transform smart meter data across multiple source systems, underpinning model training and compliance workflows
 
 **Deployment & Infrastructure**
-- Achieved a 99% reduction in infrastructure costs and 8x improvement in inference latency by re-architecting a monolithic NILM server into a three-stage serverless pipeline (extraction → inference → persistence), each stage an independent AWS Lambda with parallel, independently scalable execution
+- Achieved a 99% reduction in infrastructure costs and 8x improvement in inference latency by re-architecting a monolithic NILM server into a three-stage serverless pipeline (extraction to inference to persistence), each stage an independent AWS Lambda with parallel, independently scalable execution
 - Owned end-to-end delivery of the Home Energy Management System — optimisation models, scheduling APIs, and automated heat pump & EV charge controls — reducing user energy costs by 15%
 - Deployed Dockerised models to AWS via Terraform (IaC), enabling reproducible releases and simplified auto-scaling
 - Built and deployed event-driven microservices integrating SQS, Kinesis, DynamoDB, Lambda, and API Gateway

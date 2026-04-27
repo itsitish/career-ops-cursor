@@ -10,6 +10,21 @@ import json
 import re
 from typing import Any, Dict
 
+# Lines that are only --- / *** / ___ (LLM “section dividers”); not wanted in tailored docs.
+_THEMATIC_BREAK_LINE = re.compile(r"^\s*([-*_])\1\1+\s*$")
+
+
+def strip_thematic_break_lines(text: str) -> str:
+    """
+    Drop Markdown thematic-break lines so sections rely on headings, not horizontal rules.
+
+    Does not alter list bullets or body text that happens to mention dashes.
+    """
+    lines = [ln for ln in text.splitlines() if not _THEMATIC_BREAK_LINE.match(ln)]
+    out = "\n".join(lines).strip()
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out
+
 
 def strip_json_fences(text: str) -> str:
     """Remove optional ```json ... ``` wrapper around pasted model output."""
@@ -45,13 +60,19 @@ def parse_cursor_response_json(
     cover = parsed.get("tailored_cover_markdown")
     if not isinstance(cv, str) or not cv.strip():
         raise ValueError("Missing or invalid 'tailored_cv_markdown'.")
+    cv_out = strip_thematic_break_lines(cv.strip())
+    if not cv_out.strip():
+        raise ValueError("Missing or invalid 'tailored_cv_markdown'.")
     if require_cover:
         if not isinstance(cover, str) or not cover.strip():
             raise ValueError("Missing or invalid 'tailored_cover_markdown'.")
-        cover_out = cover.strip()
+        cover_out = strip_thematic_break_lines(cover.strip())
+        if not cover_out.strip():
+            raise ValueError("Missing or invalid 'tailored_cover_markdown'.")
     else:
-        cover_out = cover.strip() if isinstance(cover, str) and cover.strip() else ""
+        cover_raw = cover.strip() if isinstance(cover, str) and cover.strip() else ""
+        cover_out = strip_thematic_break_lines(cover_raw) if cover_raw else ""
     return {
-        "tailored_cv_markdown": cv.strip(),
+        "tailored_cv_markdown": cv_out,
         "tailored_cover_markdown": cover_out,
     }

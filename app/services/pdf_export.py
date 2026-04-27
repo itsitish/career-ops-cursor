@@ -1,31 +1,46 @@
 """
 PDF export helper for tailored CV/Cover markdown text.
 
-Splits content into a centered header (through the GitHub/contact line when present,
-otherwise a short fallback prefix) and a left-aligned body. Supports markdown headings,
-inline **bold**, and ATS-safe ASCII punctuation replacements.
+Splits content into a top banner (centred ``#`` / ``##`` and short contact lines only),
+summary paragraphs left-aligned above the divider, then a left-aligned body from
+``## Core Skills`` (or similar) onward. Supports markdown headings, inline **bold**,
+and ATS-safe ASCII punctuation replacements.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Literal
 
 from fpdf import FPDF
 
-
-OUTPUT_DIR = Path(__file__).resolve().parent.parent.parent / "output" / "resumes"
+_BASE_OUTPUT = Path(__file__).resolve().parent.parent.parent / "output"
+OUTPUT_RESUMES_DIR = _BASE_OUTPUT / "resumes"
+OUTPUT_COVERS_DIR = _BASE_OUTPUT / "covers"
 BODY_TEXT_COLOR = (25, 25, 25)
 MUTED_TEXT_COLOR = (82, 82, 82)
 HEADING_TEXT_COLOR = (68, 109, 170)
 DIVIDER_COLOR = (207, 221, 239)
 
+# First ``##`` heading that starts the main CV (left column): skills, experience, etc.
+_CV_MAIN_SECTION = re.compile(
+    r"^##\s+("
+    r"core\s+skills|key\s+skills|technical\s+skills|skills|"
+    r"experience|work\s+history|employment(\s+history)?|professional\s+experience"
+    r")\b",
+    re.IGNORECASE,
+)
+
 
 def _ats_clean(markdown_text: str) -> str:
     """Replace common Unicode punctuation with ASCII for ATS-safe output."""
     return (
-        markdown_text.replace("\u2014", "-")
+        markdown_text.replace("\u204e", "*")
+        .replace("\u2217", "*")
+        .replace("\uff0a", "*")
+        .replace("\u2014", "-")
         .replace("\u2013", "-")
         .replace("\u201c", '"')
         .replace("\u201d", '"')
@@ -76,16 +91,26 @@ def _draw_divider(pdf: FPDF) -> None:
     pdf.line(pdf.l_margin, y, pdf.w - pdf.r_margin, y)
 
 
-def _split_header_body(lines: list[str]) -> tuple[list[str], list[str]]:
+def _split_header_body(
+    lines: list[str], *, document: Literal["cv", "cover"] = "cv"
+) -> tuple[list[str], list[str]]:
     """
-    Header: from start through the first line containing ``github``
-    (case-insensitive), inclusive. If none: lines before the first ``## ``
-    (exclusive), capped at 10 lines.
+    Top region (before the main CV sections): contact through ``github`` when present;
+    else for **CV**, everything before the first main section heading (e.g. ``## Core Skills``).
+    Only name / ``##`` title / contact lines are centered in the PDF; long summary text in
+    this region is rendered left-aligned. If that heading is missing, fall back to lines
+    before the first ``## `` (exclusive), capped at 10. **Cover** letters keep the shorter
+    fallback only (first ``##`` / cap 10).
     """
     n = len(lines)
     for i, line in enumerate(lines):
         if "github" in line.lower():
             return lines[: i + 1], lines[i + 1 :]
+
+    if document == "cv":
+        for j, line in enumerate(lines):
+            if _CV_MAIN_SECTION.match(line.strip()):
+                return lines[:j], lines[j:]
 
     first_h2: int | None = None
     for j, line in enumerate(lines):
@@ -229,9 +254,12 @@ def _render_heading(
     *,
     centered: bool,
     inner_width: float,
+    accent: bool = True,
 ) -> None:
     """
     Markdown heading: bold weight and level-based size; left or centered.
+
+    ``accent=False`` uses body text colour (cover letters — no CV-style blue).
     Inline ``**`` is parsed; non-bold segments still use bold (heading style).
     """
     level = min(3, max(1, len(line) - len(line.lstrip("#"))))
@@ -239,7 +267,7 @@ def _render_heading(
     size = {1: 14, 2: 12, 3: 11}[level]
     line_h = {1: 7.0, 2: 6.5, 3: 6.0}[level]
     pdf.set_font("Helvetica", style="B", size=size)
-    _set_text_color(pdf, HEADING_TEXT_COLOR if level <= 2 else BODY_TEXT_COLOR)
+    _set_text_color(pdf, HEADING_TEXT_COLOR if accent else BODY_TEXT_COLOR)
     # Plain headings: multi_cell (C in header). Inline ``**`` uses write-based flow.
     if "**" not in text:
         pdf.multi_cell(
@@ -264,29 +292,38 @@ def _render_heading(
     pdf.set_font("Helvetica", size=10)
 
 
-def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
+def markdown_to_pdf(
+    markdown_text: str,
+    output_name: str | None = None,
+    *,
+    document: Literal["cv", "cover"] = "cv",
+) -> Path:
     """
     Export Markdown-like plain text into a simple ATS-friendly PDF.
 
-    A centered header precedes the main body (see module docstring for split rules).
+    A top banner (see module docstring) precedes the main body.
     Body lines support ``#`` headings and inline ``**bold**``.
 
     Args:
         markdown_text: CV or cover content in markdown/plain text.
         output_name: Optional filename ending in ``.pdf``.
+        document: ``cv`` uses banner + body layout; ``cover`` is a single left-aligned
+            letter (no centred header block or divider).
     Returns:
         Absolute path of the generated PDF.
     """
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = OUTPUT_RESUMES_DIR if document == "cv" else OUTPUT_COVERS_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
     if output_name:
         filename = Path(output_name).name
         if not filename.lower().endswith(".pdf"):
             filename = f"{filename}.pdf"
     else:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        filename = f"tailored-cv-{stamp}.pdf"
+        prefix = "tailored-cv" if document == "cv" else "tailored-cover"
+        filename = f"{prefix}-{stamp}.pdf"
 
-    out_path = OUTPUT_DIR / filename
+    out_path = out_dir / filename
 
     pdf = FPDF(format="A4")
     pdf.set_auto_page_break(auto=True, margin=12)
@@ -296,8 +333,33 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
 
     cleaned = _ats_clean(markdown_text)
     all_lines = cleaned.splitlines()
-    header_lines, body_lines = _split_header_body(all_lines)
     inner_w = pdf.w - pdf.l_margin - pdf.r_margin
+
+    if document == "cover":
+        for raw in all_lines:
+            line = raw.rstrip()
+            if not line:
+                pdf.ln(4)
+                continue
+            if line.startswith("#"):
+                _render_heading(
+                    pdf, line, centered=False, inner_width=inner_w, accent=False
+                )
+                continue
+            _set_text_color(pdf, BODY_TEXT_COLOR)
+            _render_mixed_markdown_line(
+                pdf,
+                line,
+                line_height=5.0,
+                font_size=10,
+                base_style="",
+                align="L",
+                inner_width=inner_w,
+            )
+        pdf.output(str(out_path))
+        return out_path
+
+    header_lines, body_lines = _split_header_body(all_lines, document=document)
 
     header_name_boost_done = False
     for raw in header_lines:
@@ -306,7 +368,11 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
             pdf.ln(4)
             continue
         if line.startswith("#"):
-            _render_heading(pdf, line, centered=True, inner_width=inner_w)
+            # Centre only ``#`` / ``##``; ``###``+ in the banner reads better flush left.
+            level = min(3, max(1, len(line) - len(line.lstrip("#"))))
+            _render_heading(
+                pdf, line, centered=(level <= 2), inner_width=inner_w
+            )
             continue
         fs = 10
         if not header_name_boost_done and _looks_like_name(line):
@@ -316,13 +382,18 @@ def markdown_to_pdf(markdown_text: str, output_name: str | None = None) -> Path:
             pdf,
             MUTED_TEXT_COLOR if _looks_like_contact_line(line) else BODY_TEXT_COLOR,
         )
+        # Long summary paragraphs look broken when centred (ragged centre wraps); keep
+        # only short name/contact-style lines centred.
+        short_centre = _looks_like_contact_line(line) or _looks_like_name(line)
+        align = "C" if short_centre else "L"
+        line_h = 6.0 if align == "C" else 5.0
         _render_mixed_markdown_line(
             pdf,
             line,
-            line_height=6.0,
+            line_height=line_h,
             font_size=fs,
             base_style="",
-            align="C",
+            align=align,
             inner_width=inner_w,
         )
     _set_text_color(pdf, BODY_TEXT_COLOR)

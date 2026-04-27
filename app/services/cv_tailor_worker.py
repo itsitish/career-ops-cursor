@@ -505,6 +505,10 @@ class CvTailorWorker:
                     "cover_requested": bool (optional),
                     "prompt_only": bool (optional),
                     "locale_hint": str (optional, e.g. en-GB),
+                    "reference_master_in_cursor": bool (optional, default True),
+                    "reference_kb_in_cursor": bool (optional, default True),
+                    "master_cv_repo_path": str (optional, for @ hint),
+                    "kb_digest_repo_path": str (optional, for @ hint),
                 },
             }
 
@@ -540,12 +544,21 @@ class CvTailorWorker:
 
         locale_hint = str(payload.get("locale_hint") or "en-GB").strip() or "en-GB"
 
+        reference_master = bool(payload.get("reference_master_in_cursor", True))
+        reference_kb = bool(payload.get("reference_kb_in_cursor", True))
+        master_cv_repo_path = str(payload.get("master_cv_repo_path") or "").strip()
+        kb_digest_repo_path = str(payload.get("kb_digest_repo_path") or "").strip()
+
         prompt_markdown = self._build_prompt_markdown(
             jd_text=jd_text.strip(),
             master_cv_markdown=master_cv.strip(),
             kb_highlights=kb_lines,
             cover_requested=cover_requested,
             locale_hint=locale_hint,
+            reference_master_in_cursor=reference_master,
+            reference_kb_in_cursor=reference_kb,
+            master_cv_repo_path=master_cv_repo_path,
+            kb_digest_repo_path=kb_digest_repo_path,
         )
         checklist = self._build_checklist(
             jd_text=jd_text.strip(),
@@ -586,11 +599,19 @@ class CvTailorWorker:
         *,
         cover_requested: bool = False,
         locale_hint: str = "en-GB",
+        reference_master_in_cursor: bool = False,
+        reference_kb_in_cursor: bool = False,
+        master_cv_repo_path: str = "",
+        kb_digest_repo_path: str = "",
     ) -> str:
         """
         Assemble the full Markdown prompt: JD analysis, keyword evidence, tasks, constraints.
 
         Designed for Cursor chat to refactor and reword the CV using only supplied facts.
+
+        When reference flags are True, the matching full-text sections are omitted from the
+        paste so the user can ``@`` repo files once per thread; evidence tables still use
+        the full master and KB strings computed server-side.
         """
         kb_block = _bullet_list(kb_highlights)
         cv_block = master_cv_markdown if master_cv_markdown else "_Master CV empty — paste your CV here._"
@@ -642,47 +663,133 @@ class CvTailorWorker:
             "(JD alignment). Call out **gaps** where the JD asks for something not in the materials.\n"
         )
 
+        master_path_hint = (
+            f"`@{master_cv_repo_path}`"
+            if master_cv_repo_path
+            else "your attached **Master CV** file in this thread"
+        )
+        kb_path_hint = (
+            f"`@{kb_digest_repo_path}`"
+            if kb_digest_repo_path
+            else "your attached **Knowledge base digest** file in this thread"
+        )
+
+        if reference_master_in_cursor and reference_kb_in_cursor:
+            role_block = (
+                "## Role\n"
+                "You are refining a job application in **Cursor**. Use **only** facts present in the "
+                f"**Master CV** (already in this thread — attach {master_path_hint} if missing) and the "
+                f"**Knowledge base** (already in this thread — attach {kb_path_hint} if missing). "
+                "Do not invent employers, dates, metrics, degrees, certifications, or tools. "
+                "If a JD requirement is not evidenced, state it in the change log as a gap — do not imply you have it.\n\n"
+            )
+        elif reference_master_in_cursor:
+            role_block = (
+                "## Role\n"
+                "You are refining a job application in **Cursor**. Use **only** facts present in the "
+                f"**Master CV** (already in this thread — attach {master_path_hint} if missing) and in the "
+                "**Knowledge-base highlights** below. Do not invent employers, dates, metrics, degrees, "
+                "certifications, or tools. If a JD requirement is not evidenced, state it in the change log as a gap — "
+                "do not imply you have it.\n\n"
+            )
+        elif reference_kb_in_cursor:
+            role_block = (
+                "## Role\n"
+                "You are refining a job application in **Cursor**. Use **only** facts present in the "
+                "**Master CV** below and in the **Knowledge base** "
+                f"(already in this thread — attach {kb_path_hint} if missing). "
+                "Do not invent employers, dates, metrics, degrees, certifications, or tools. "
+                "If a JD requirement is not evidenced, state it in the change log as a gap — do not imply you have it.\n\n"
+            )
+        else:
+            role_block = (
+                "## Role\n"
+                "You are refining a job application in **Cursor**. Use **only** facts present in the "
+                "**Master CV** and **Knowledge-base highlights**. Do not invent employers, dates, metrics, "
+                "degrees, certifications, or tools. If a JD requirement is not evidenced, state it in the "
+                "change log as a gap — do not imply you have it.\n\n"
+            )
+
+        if reference_master_in_cursor:
+            master_section = (
+                "## Master CV (context)\n"
+                "The full **Master CV** Markdown is **not** pasted again here to save context. "
+                f"It should already be attached in this thread ({master_path_hint}). "
+                "Treat that source as canonical for employers, titles, dates, metrics, and tools. "
+                "If you no longer see it in context, ask the user to re-attach the same file — do not ask them to "
+                "paste the entire CV inline.\n\n"
+            )
+        else:
+            master_section = "## Master CV (Markdown)\n" + f"{cv_block}\n\n"
+
+        if reference_kb_in_cursor:
+            kb_section = (
+                "## Knowledge base (context)\n"
+                "KB highlights are **not** inlined again here. Facts and notes should already be in this thread via "
+                f"{kb_path_hint} (generate or refresh the digest in the Career Ops app after KB changes). "
+                "Use that file together with the evidence table above. If it is missing from context, ask the user "
+                "to re-attach it.\n\n"
+            )
+        else:
+            kb_section = "## Knowledge-base highlights (trusted facts / themes)\n" + f"{kb_block}\n\n"
+
+        if reference_master_in_cursor and reference_kb_in_cursor:
+            constraints_tail = (
+                "- If the JD requires something not evidenced in the attached Master CV or KB digest, "
+                "document it only in the **change log** as a gap.\n"
+            )
+        elif reference_master_in_cursor:
+            constraints_tail = (
+                "- If the JD requires something not evidenced in the attached Master CV or the KB highlights below, "
+                "document it only in the **change log** as a gap.\n"
+            )
+        elif reference_kb_in_cursor:
+            constraints_tail = (
+                "- If the JD requires something not evidenced in the Master CV below or the attached KB digest, "
+                "document it only in the **change log** as a gap.\n"
+            )
+        else:
+            constraints_tail = (
+                "- If the JD requires something not evidenced in the master CV or highlights, "
+                "document it only in the **change log** as a gap.\n"
+            )
+
         return (
-            "## Role\n"
-            "You are refining a job application in **Cursor**. Use **only** facts present in the "
-            "**Master CV** and **Knowledge-base highlights**. Do not invent employers, dates, metrics, "
-            "degrees, certifications, or tools. If a JD requirement is not evidenced, state it in the "
-            "change log as a gap — do not imply you have it.\n\n"
-            "## Job description (verbatim)\n"
-            f"{jd_block}\n\n"
-            "## JD signals (deterministic extract)\n"
-            "### Lines likely tied to requirements / responsibilities\n"
-            f"{must_block}\n\n"
-            "### Keyword ↔ evidence (master CV + KB)\n"
-            "Use this to prioritize wording and to flag honest gaps.\n\n"
-            f"{evidence_table}\n\n"
-            "## Master CV (Markdown)\n"
-            f"{cv_block}\n\n"
-            "## Knowledge-base highlights (trusted facts / themes)\n"
-            f"{kb_block}\n\n"
-            "## Rewriting guidance\n"
-            "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
-            "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
-            "- **Selection pressure:** treat the JD as the ranking function. If a bullet does not help this application, "
+            role_block
+            + "## Job description (verbatim)\n"
+            + f"{jd_block}\n\n"
+            + "## JD signals (deterministic extract)\n"
+            + "### Lines likely tied to requirements / responsibilities\n"
+            + f"{must_block}\n\n"
+            + "### Keyword ↔ evidence (master CV + KB)\n"
+            + "Use this to prioritize wording and to flag honest gaps.\n\n"
+            + f"{evidence_table}\n\n"
+            + master_section
+            + kb_section
+            + "## Rewriting guidance\n"
+            + "- Prefer **British English** for UK JDs and **US English** for US JDs when unambiguous from the JD.\n"
+            + "- **ATS:** include role-relevant keywords naturally in headings and first bullets where they match truth.\n"
+            + "- **Selection pressure:** treat the JD as the ranking function. If a bullet does not help this application, "
             "rewrite it sharply, compress it, or remove it.\n"
-            "- **Experience pruning:** it is acceptable to shorten or drop low-value bullets and less relevant projects; "
+            + "- **Experience pruning:** it is acceptable to shorten or drop low-value bullets and less relevant projects; "
             "do not keep content just because it exists in the master CV.\n"
-            "- **Bullet rewriting:** prefer rewriting bullets around outcomes, scope, and role-relevant skills rather "
+            + "- **Bullet rewriting:** prefer rewriting bullets around outcomes, scope, and role-relevant skills rather "
             "than lightly paraphrasing the original sentence.\n"
-            "- **Repetition control:** do not reuse the same JD phrase or marketing line multiple times unless it is "
+            + "- **Repetition control:** do not reuse the same JD phrase or marketing line multiple times unless it is "
             "genuinely necessary; spread related concepts across varied, natural wording.\n"
-            "- **Failure mode to avoid:** do not return a near-copy of the master CV. The final draft should show real "
+            + "- **Failure mode to avoid:** do not return a near-copy of the master CV. The final draft should show real "
             "prioritization, rewritten bullets, and visible pruning where the JD makes that appropriate.\n"
-            "- **Markdown:** use `**bold**` deliberately for Core Skills labels and important JD-aligned keywords "
+            + "- **Markdown:** use `**bold**` deliberately for Core Skills labels and important JD-aligned keywords "
             "throughout the CV; keep bolding to short phrases, not whole bullets or paragraphs.\n"
-            "- **No fabrication:** paraphrase and compress; never add employers, tools, or numbers not in the source.\n\n"
-            "## Tasks\n"
-            f"{tasks_block}\n"
-            "## Constraints\n"
-            "- No fabricated achievements, numbers, or credentials.\n"
-            "- If the JD requires something not evidenced in the master CV or highlights, "
-            "document it only in the **change log** as a gap.\n"
-            "- Do not preserve every original bullet or project by default; remove or compress low-value content when "
+            + "- **No horizontal rules:** do not use `---`, `***`, or `___` lines between sections; use `##` / `###` "
+            "headings and blank lines only.\n"
+            + "- **No fabrication:** paraphrase and compress; never add employers, tools, or numbers not in the source.\n\n"
+            + "## Tasks\n"
+            + f"{tasks_block}\n"
+            + "## Constraints\n"
+            + "- No fabricated achievements, numbers, or credentials.\n"
+            + constraints_tail
+            + "- Do not preserve every original bullet or project by default; remove or compress low-value content when "
             "it improves JD fit.\n"
         )
 

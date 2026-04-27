@@ -7,7 +7,6 @@ Schedules one job per day at 08:30 in the host's local timezone using APSchedule
 
 from __future__ import annotations
 
-import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,7 +21,7 @@ if str(_ROOT) not in sys.path:
 
 from app.settings import load_settings  # noqa: E402
 from app.services.scraper_worker import ScraperWorker  # noqa: E402
-from app.services.storage import Storage  # noqa: E402
+from app.services.storage import Storage, job_upsert_from_listing  # noqa: E402
 
 _CONFIG_PATH = _ROOT / "config" / "scrape_sources.yml"
 
@@ -61,23 +60,16 @@ def _run_scrape_and_store() -> dict[str, Any]:
     result = worker.process(task)
 
     inserted = 0
-    skipped_dup = 0
+    updated = 0
     if result.get("ok") and result.get("listings"):
         for listing in result["listings"]:
-            try:
-                storage.job_insert(
-                    company=listing.get("company") or "",
-                    role=listing.get("role") or "",
-                    link=listing.get("link") or "",
-                    salary_text=listing.get("salary_text"),
-                    location=listing.get("location"),
-                    source=listing.get("source"),
-                    jd_text=listing.get("jd_text"),
-                    status="new",
-                )
+            op = job_upsert_from_listing(
+                listing, insert_status="new", db_path=storage.db_path
+            )
+            if op == "inserted":
                 inserted += 1
-            except sqlite3.IntegrityError:
-                skipped_dup += 1
+            elif op == "updated":
+                updated += 1
 
     err_count = len(result.get("errors") or [])
     listing_count = len(result.get("listings") or [])
@@ -87,7 +79,7 @@ def _run_scrape_and_store() -> dict[str, Any]:
         "urls": len(urls),
         "listings": listing_count,
         "inserted": inserted,
-        "skipped_duplicate_link": skipped_dup,
+        "updated_existing": updated,
         "errors": err_count,
         "min_salary_gbp": result.get("min_salary_gbp", settings.min_salary_gbp),
     }
@@ -101,7 +93,7 @@ def _print_summary(s: dict[str, Any]) -> None:
         f"urls={s['urls']}",
         f"listings={s['listings']}",
         f"inserted={s['inserted']}",
-        f"dup_skip={s['skipped_duplicate_link']}",
+        f"updated={s['updated_existing']}",
         f"errors={s['errors']}",
         f"min_gbp={s['min_salary_gbp']}",
     ]

@@ -2,10 +2,15 @@
   Master CV / profile source. Curate bullets here; used as the canonical narrative
   for tailoring and applications.
 -->
+ITISH SINGH
+Data Scientist | MLOps| AWS | AI/ML
+Leeds · 07920 842809 · itishsingh96@gmail.com
+linkedin.com/in/itish-singh-09853733 · https://github.com/itsitish
 
 ## Career summary
 
 - Full-stack data scientist with 5+ years building and deploying ML systems end-to-end in Python, PySpark, and SQL on AWS. Shipped RNN forecasters, signal decomposition pipelines, and serverless inference architectures serving 60,000+ households Skilled in the entire lifecyle from feature engineering and distributed data processing to SageMaker training, deployment, and production monitoring.
+
 
 ## Education
 
@@ -18,7 +23,7 @@ Focus: Python, SQL, MongoDB, Data Structures
 
 ## Skills
 
-- Agentic AI & LLMs: GPT Agents, RAG, Vector Databases, Prompt Engineering, CursorAI, Claude API, OpenClaw
+- Agentic AI & LLMs: GPT Agents, RAG, Vector Databases, Prompt Engineering, CursorAI, Claude API, OpenClaw, HuggingFace
 - Data Science & ML: Gradient Boosting, Regression, Forecasting, Clustering, Deep Learning (RNNs, CNNs), Hypothesis Testing, A/B Testing
 - Programming & Tools: Python (PyTorch, pandas, scikit-learn, FastAPI), SQL, Git, Jira, Scrum/Kanban, Unit Testing, CI/CD
 - Distributed Processing: PySpark, AWS Glue, Lambdas
@@ -84,7 +89,7 @@ Data and software engineer embedded in the British Petroleum account, delivering
 
 - Image Caption Generation (NLP): Engineered and optimized a deep learning model to create captions for an input image. Optimised for accuracy by using several key performance indicators
 
-- Agentic Market Research Pipeline: Used OpenClaw to orchestrate multi-agent workflows with Anthropic Claude API, scraping and summarising stock market blog posts into structured insights — demonstrating hands-on agentic AI capability applied to unstructured financial content.
+- Agentic Market Research Pipeline: Used OpenClaw and HuggingFace to orchestrate multi-agent workflows, scraping and summarising stock market blog posts into structured insights — demonstrating hands-on agentic AI capability applied to unstructured financial content.
 
 - Self-hosted Job-Search Platform (FastAPI): Built a Python/FastAPI app with SQLite and worker-backed background tasks, wrapping a human-in-the-loop Cursor + GPT layer for prompt and document work focused on tracking and consistency.
 

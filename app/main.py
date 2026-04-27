@@ -6,15 +6,17 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import uuid
-import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
+import yaml
+from docx import Document
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from pypdf import PdfReader
 
@@ -23,11 +25,11 @@ from app.services.ats_worker import AtsScoringWorker
 from app.services.cursor_response import parse_cursor_response_json
 from app.services.cv_tailor_worker import CvTailorWorker
 from app.services.monitor_agent import MonitorAgent
+from app.services.md_preview import tailor_markdown_to_safe_html
 from app.services.pdf_export import markdown_to_pdf
 from app.services.scraper_worker import ScraperWorker
 from app.services import storage
 from app.settings import AppSettings, load_settings
-from docx import Document
 
 # Templates live next to this package under app/templates/
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -38,6 +40,13 @@ _UPLOAD_DIR = storage.DATA_DIR / "uploads"
 
 # Repository root (parent of ``app/``) for optional ``.env``.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Default scrape URL list for dashboard presets (same file as daily scheduler).
+_SCRAPE_SOURCES_PATH = _PROJECT_ROOT / "config" / "scrape_sources.yml"
+
+# Repo-relative paths for Cursor ``@`` hints (under ``_PROJECT_ROOT``).
+_MASTER_PROFILE_RELATIVE = "config/master_profile.md"
+_KB_DIGEST_RELATIVE = "config/kb_digest.md"
 
 # KB list API / dashboard: max characters for one-line preview text.
 _KB_PREVIEW_CHARS = 240
@@ -150,39 +159,8 @@ def upsert_job_listing(listing: Dict[str, Any]) -> Optional[Literal["inserted", 
     Returns:
         ``\"inserted\"``, ``\"updated\"``, or ``None`` if ``link`` is missing.
     """
-    link = (listing.get("link") or "").strip()
-    if not link:
-        return None
-    company = str(listing.get("company") or "")
-    role = str(listing.get("role") or "Unknown role")
-    salary_text = listing.get("salary_text")
-    location = listing.get("location")
-    source = listing.get("source")
-    jd_text = listing.get("jd_text")
-    existing = storage.job_get_by_link(link)
-    if existing:
-        storage.job_update(
-            int(existing["id"]),
-            company=company or None,
-            role=role,
-            link=link,
-            salary_text=salary_text,
-            location=location,
-            source=source,
-            jd_text=jd_text,
-        )
-        return "updated"
-    storage.job_insert(
-        company=company or "Unknown",
-        role=role,
-        link=link,
-        salary_text=salary_text,
-        location=location,
-        source=source,
-        jd_text=jd_text,
-        status="scraped",
-    )
-    return "inserted"
+    out = storage.job_upsert_from_listing(listing, insert_status="scraped")
+    return out  # type: ignore[return-value]
 
 
 def kb_highlights_latest(limit: int = 10) -> List[str]:
@@ -277,6 +255,138 @@ def latest_master_cv_text() -> Optional[str]:
     return fallback or None
 
 
+def load_scrape_source_urls() -> List[str]:
+    """
+    Load the ``urls`` list from ``config/scrape_sources.yml``.
+
+    Used by the dashboard scrape preset dropdown and matches the scheduler config path.
+    """
+    if not _SCRAPE_SOURCES_PATH.is_file():
+        return []
+    try:
+        raw = yaml.safe_load(_SCRAPE_SOURCES_PATH.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return []
+    urls = raw.get("urls", [])
+    if not isinstance(urls, list):
+        return []
+    return [str(u).strip() for u in urls if str(u).strip()]
+
+
+def resolve_master_cv_markdown(body_override: Optional[str]) -> tuple[str, str, Optional[str]]:
+    """
+    Resolve canonical master CV markdown for tailoring.
+
+    Order:
+    1. Non-empty ``body_override`` (dashboard textarea).
+    2. ``config/master_profile.md`` when present.
+    3. KB upload heuristic (:func:`latest_master_cv_text`).
+
+    Returns:
+        ``(markdown, source, repo_relative_path)`` where ``repo_relative_path`` is set
+        when the text came from ``master_profile.md`` (for Cursor ``@`` hints).
+    """
+    if isinstance(body_override, str) and body_override.strip():
+        return body_override.strip(), "body", None
+    profile_path = _PROJECT_ROOT / _MASTER_PROFILE_RELATIVE
+    if profile_path.is_file():
+        text = profile_path.read_text(encoding="utf-8", errors="replace").strip()
+        if text:
+            rel = profile_path.relative_to(_PROJECT_ROOT).as_posix()
+            return text, "file", rel
+    from_kb = latest_master_cv_text()
+    if from_kb:
+        return from_kb, "kb", None
+    return "", "none", None
+
+
+def master_cv_repo_hint_path() -> str:
+    """Return ``config/master_profile.md`` when that file exists, else ``\"\"``."""
+    profile_path = _PROJECT_ROOT / _MASTER_PROFILE_RELATIVE
+    if profile_path.is_file():
+        return profile_path.relative_to(_PROJECT_ROOT).as_posix()
+    return ""
+
+
+def build_kb_digest_markdown() -> str:
+    """Render all KB rows as one Markdown file for Cursor ``@`` reference."""
+    rows = storage.kb_list(limit=500, offset=0)
+    lines: List[str] = [
+        "# Knowledge base digest",
+        "",
+        "_Generated by Career Ops. Refreshed automatically when KB entries are added, "
+        "uploaded, or deleted; you can also call ``POST /api/kb/write-digest`` or "
+        "``GET /api/kb/export.md``._",
+        "",
+    ]
+    for r in rows:
+        eid = r.get("id")
+        et = r.get("entry_type") or ""
+        created = r.get("created_at") or ""
+        src = r.get("source_file") or ""
+        content = str(r.get("content") or "").strip()
+        lines.append(f"## KB entry #{eid} ({et})")
+        if created:
+            lines.append(f"- Created: {created}")
+        if src:
+            lines.append(f"- Source: {src}")
+        lines.append("")
+        lines.append(content if content else "_(empty)_")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def refresh_kb_digest_file() -> dict[str, Any]:
+    """
+    Write ``config/kb_digest.md`` from the current KB table.
+
+    Intended to run after any KB mutation so the Cursor ``@`` file stays in sync.
+
+    Returns:
+        ``{"ok": True, "path", "repo_relative", "chars"}`` or ``{"ok": False, "error"}``.
+    """
+    path = _PROJECT_ROOT / _KB_DIGEST_RELATIVE
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        text = build_kb_digest_markdown()
+        path.write_text(text, encoding="utf-8")
+        rel = path.relative_to(_PROJECT_ROOT).as_posix()
+        return {
+            "ok": True,
+            "path": str(path),
+            "repo_relative": rel,
+            "chars": len(text),
+        }
+    except OSError as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def cursor_prompt_preamble(
+    *,
+    reference_master_in_cursor: bool,
+    reference_kb_in_cursor: bool,
+    master_cv_repo_path: str,
+    kb_digest_repo_path: str,
+) -> str:
+    """Short reminder to attach ``@`` files before pasting the rest of the prompt."""
+    if not reference_master_in_cursor and not reference_kb_in_cursor:
+        return ""
+    parts: List[str] = ["**Cursor prerequisites:** In this thread, attach "]
+    ats: List[str] = []
+    if reference_master_in_cursor:
+        if master_cv_repo_path:
+            ats.append(f"`@{master_cv_repo_path}` (Master CV)")
+        else:
+            ats.append("your **Master CV** file")
+    if reference_kb_in_cursor:
+        ats.append(f"`@{kb_digest_repo_path}` (KB digest)")
+    parts.append(", ".join(ats))
+    parts.append(" once (re-attach if context was lost), then apply the prompt below.\n\n")
+    return "".join(parts)
+
+
 def build_copy_paste_prompt(base_prompt: str, *, cover_requested: bool = False) -> str:
     """
     Append strict JSON output instructions for the copy/paste Cursor workflow.
@@ -340,15 +450,18 @@ async def dashboard(request: Request) -> Any:
     settings: AppSettings = getattr(request.app.state, "settings", load_settings(_PROJECT_ROOT))
     jobs = storage.job_list(limit=30)
     applications = storage.application_list(limit=30)
-    master_cv_prefill = latest_master_cv_text() or ""
+    master_cv_prefill, _, _ = resolve_master_cv_markdown(None)
     latest_cursor_prompt = str(getattr(request.app.state, "latest_cursor_prompt", "") or "")
     latest_tailored_cv = str(getattr(request.app.state, "latest_tailored_cv", "") or "")
     latest_tailored_cover = str(getattr(request.app.state, "latest_tailored_cover", "") or "")
+    latest_tailored_cv_html = tailor_markdown_to_safe_html(latest_tailored_cv)
+    latest_tailored_cover_html = tailor_markdown_to_safe_html(latest_tailored_cover)
     snap = monitor.snapshot()
     snap_json = json.dumps(snap, indent=2, sort_keys=True)
     kb_rows = [
         _kb_summary_fields(dict(r)) for r in storage.kb_list(limit=300, offset=0)
     ]
+    scrape_source_urls = load_scrape_source_urls()
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -360,9 +473,12 @@ async def dashboard(request: Request) -> Any:
             "latest_cursor_prompt": latest_cursor_prompt,
             "latest_tailored_cv": latest_tailored_cv,
             "latest_tailored_cover": latest_tailored_cover,
+            "latest_tailored_cv_html": latest_tailored_cv_html,
+            "latest_tailored_cover_html": latest_tailored_cover_html,
             "monitor_json": snap_json,
             "config_target_roles": settings.target_roles,
             "config_min_salary_gbp": settings.min_salary_gbp,
+            "scrape_source_urls": scrape_source_urls,
         },
     )
 
@@ -374,7 +490,9 @@ async def api_kb_add_text(
 ) -> JSONResponse:
     """Store a KB row from form fields ``content`` and optional ``entry_type``."""
     entry_id = storage.kb_insert(entry_type=entry_type or "note", content=content)
-    return JSONResponse({"ok": True, "id": entry_id})
+    return JSONResponse(
+        {"ok": True, "id": entry_id, "kb_digest": refresh_kb_digest_file()}
+    )
 
 
 @app.post("/api/kb/upload")
@@ -405,7 +523,13 @@ async def api_kb_upload(file: UploadFile = File(...)) -> JSONResponse:
         source_file=str(dest.relative_to(storage.DATA_DIR)),
     )
     return JSONResponse(
-        {"ok": True, "id": entry_id, "stored_path": str(dest), "chars": len(text)}
+        {
+            "ok": True,
+            "id": entry_id,
+            "stored_path": str(dest),
+            "chars": len(text),
+            "kb_digest": refresh_kb_digest_file(),
+        }
     )
 
 
@@ -441,7 +565,37 @@ async def api_kb_delete(entry_id: int) -> JSONResponse:
     """Delete a knowledge-base row by id."""
     if not storage.kb_delete(entry_id):
         raise HTTPException(status_code=404, detail="KB entry not found")
-    return JSONResponse({"ok": True, "id": entry_id})
+    return JSONResponse(
+        {"ok": True, "id": entry_id, "kb_digest": refresh_kb_digest_file()}
+    )
+
+
+@app.get("/api/kb/export.md")
+async def api_kb_export_md() -> Response:
+    """Return a Markdown digest of all KB rows for download or Cursor ``@`` reference."""
+    body = build_kb_digest_markdown()
+    return Response(
+        content=body,
+        media_type="text/markdown; charset=utf-8",
+    )
+
+
+@app.post("/api/kb/write-digest")
+async def api_kb_write_digest() -> JSONResponse:
+    """Write ``config/kb_digest.md`` under the project root from the current KB table."""
+    out = refresh_kb_digest_file()
+    if not out.get("ok"):
+        raise HTTPException(
+            status_code=500, detail=str(out.get("error", "write failed"))
+        )
+    return JSONResponse(
+        {
+            "ok": True,
+            "path": out["path"],
+            "repo_relative": out["repo_relative"],
+            "chars": out["chars"],
+        }
+    )
 
 
 @app.post("/api/jobs/score")
@@ -496,18 +650,31 @@ async def api_jobs_tailor_prompt(
     settings: AppSettings = getattr(request.app.state, "settings", load_settings(_PROJECT_ROOT))
     monitor: MonitorAgent = request.app.state.monitor
     jd_text = payload.get("jd_text")
-    master_cv = payload.get("master_cv_markdown")
+    body_cv = payload.get("master_cv_markdown")
     if jd_text is None:
         raise HTTPException(status_code=400, detail="jd_text required")
-    if not isinstance(master_cv, str) or not master_cv.strip():
-        master_cv = latest_master_cv_text()
-    if not isinstance(master_cv, str) or not master_cv.strip():
+    if isinstance(body_cv, str) and body_cv.strip():
+        master_cv, master_source, master_rel = resolve_master_cv_markdown(body_cv)
+    else:
+        master_cv, master_source, master_rel = resolve_master_cv_markdown(None)
+    if not master_cv.strip():
         raise HTTPException(
             status_code=400,
-            detail="No master CV found. Upload your master CV first in 'Upload KB file'.",
+            detail=(
+                "No master CV found. Add config/master_profile.md or upload a master CV "
+                "to the Knowledge Base (filename containing 'master' and 'cv' is preferred)."
+            ),
         )
 
     cover_requested = bool(payload.get("cover_requested", False))
+    reference_master_in_cursor = bool(payload.get("reference_master_in_cursor", True))
+    reference_kb_in_cursor = bool(payload.get("reference_kb_in_cursor", True))
+
+    master_cv_repo_path = ""
+    if reference_master_in_cursor:
+        master_cv_repo_path = master_rel or master_cv_repo_hint_path()
+
+    kb_digest_repo_path = _KB_DIGEST_RELATIVE if reference_kb_in_cursor else ""
 
     highlights_raw = kb_highlights_latest(10)
     highlights = dedupe_kb_highlights(highlights_raw)
@@ -522,6 +689,10 @@ async def api_jobs_tailor_prompt(
                 "cover_requested": cover_requested,
                 "prompt_only": True,
                 "locale_hint": settings.locale_hint,
+                "reference_master_in_cursor": reference_master_in_cursor,
+                "reference_kb_in_cursor": reference_kb_in_cursor,
+                "master_cv_repo_path": master_cv_repo_path,
+                "kb_digest_repo_path": kb_digest_repo_path,
             },
         }
     )
@@ -539,7 +710,15 @@ async def api_jobs_tailor_prompt(
         )
     result: Dict[str, Any] = dict(rec.result or {})
     base_prompt = str(result.get("prompt_markdown") or "")
-    cursor_prompt = build_copy_paste_prompt(base_prompt, cover_requested=cover_requested)
+    preamble = cursor_prompt_preamble(
+        reference_master_in_cursor=reference_master_in_cursor,
+        reference_kb_in_cursor=reference_kb_in_cursor,
+        master_cv_repo_path=master_cv_repo_path,
+        kb_digest_repo_path=kb_digest_repo_path,
+    )
+    cursor_prompt = preamble + build_copy_paste_prompt(
+        base_prompt, cover_requested=cover_requested
+    )
     request.app.state.latest_cursor_prompt = cursor_prompt
 
     next_ingest = (
@@ -547,11 +726,21 @@ async def api_jobs_tailor_prompt(
         "/api/jobs/ingest-cursor-response with the same cover_requested value."
     )
 
+    approx_chars = len(cursor_prompt)
+    approx_tokens = max(approx_chars // 4, 0)
+
     return JSONResponse(
         {
             "ok": True,
             "task_id": task_id,
             "cover_requested": cover_requested,
+            "reference_master_in_cursor": reference_master_in_cursor,
+            "reference_kb_in_cursor": reference_kb_in_cursor,
+            "master_cv_source": master_source,
+            "master_cv_repo_path": master_cv_repo_path or None,
+            "kb_digest_repo_path": kb_digest_repo_path or None,
+            "approx_prompt_chars": approx_chars,
+            "approx_prompt_tokens": approx_tokens,
             "kb_entries_used": len(highlights_raw),
             "kb_entries_after_dedup": len(highlights),
             "workflow_mode": "copy-paste-cursor-chat",
@@ -585,13 +774,17 @@ async def api_jobs_ingest_cursor_response(
 
     request.app.state.latest_tailored_cv = parsed["tailored_cv_markdown"]
     request.app.state.latest_tailored_cover = parsed["tailored_cover_markdown"]
+    cv_md = parsed["tailored_cv_markdown"]
+    cov_md = parsed["tailored_cover_markdown"]
     return JSONResponse(
         {
             "ok": True,
             "cover_requested": cover_requested,
             "workflow_mode": "copy-paste-cursor-chat",
-            "tailored_cv_markdown": parsed["tailored_cv_markdown"],
-            "tailored_cover_markdown": parsed["tailored_cover_markdown"],
+            "tailored_cv_markdown": cv_md,
+            "tailored_cover_markdown": cov_md,
+            "tailored_cv_html": tailor_markdown_to_safe_html(cv_md),
+            "tailored_cover_html": tailor_markdown_to_safe_html(cov_md),
         }
     )
 
@@ -714,13 +907,22 @@ async def api_jobs_delete(job_id: int) -> JSONResponse:
 
 @app.post("/api/cv/export-pdf")
 async def api_cv_export_pdf(payload: Dict[str, Any] = Body(...)) -> JSONResponse:
-    """Export markdown/plain text to a local PDF in ``output/resumes``."""
+    """
+    Export markdown/plain text to a local PDF.
+
+    CVs go to ``output/resumes``; cover letters to ``output/covers`` when
+    ``document`` is ``\"cover\"`` (default ``\"cv\"``).
+    """
     markdown_text = payload.get("markdown_text")
     output_name = payload.get("output_name")
+    doc_raw = payload.get("document", "cv")
+    document = "cover" if doc_raw == "cover" else "cv"
     if not isinstance(markdown_text, str) or not markdown_text.strip():
         raise HTTPException(status_code=400, detail="markdown_text required")
     try:
-        out_path = markdown_to_pdf(markdown_text, output_name=output_name)
+        out_path = markdown_to_pdf(
+            markdown_text, output_name=output_name, document=document
+        )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return JSONResponse({"ok": True, "path": str(out_path)})

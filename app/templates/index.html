@@ -21,42 +21,134 @@
     body {
       font-family: system-ui, sans-serif;
       margin: 0;
-      padding: 1.25rem 1.5rem 2rem;
-      max-width: 1200px;
-      margin-left: auto;
-      margin-right: auto;
+      padding: 0;
       color: var(--text);
       background: linear-gradient(165deg, var(--bg) 0%, #e8f5f0 45%, #f8f0ff 100%);
       min-height: 100vh;
     }
-    h1 { font-size: 1.35rem; color: #3d3a44; }
-    .page-section {
-      margin-bottom: 2rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid var(--card-border);
-    }
-    .page-section:last-of-type { border-bottom: none; }
-    .page-section-header {
+    .dashboard-layout {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.35rem;
+      align-items: stretch;
+      min-height: 100vh;
     }
+    .dashboard-layout .side-nav {
+      transition: width 0.2s ease, opacity 0.18s ease, padding 0.2s ease, border-color 0.2s ease;
+    }
+    .dashboard-layout.sidebar-hidden .side-nav {
+      width: 0;
+      min-width: 0;
+      padding-left: 0;
+      padding-right: 0;
+      overflow: hidden;
+      border-right-width: 0;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: none;
+    }
+    .side-nav {
+      width: 12.5rem;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 1rem 0.75rem 1.5rem;
+      box-sizing: border-box;
+      background: var(--surface);
+      border-right: 1px solid var(--card-border);
+      box-shadow: 2px 0 8px rgba(80, 100, 140, 0.06);
+    }
+    .sidebar-toggle-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: 0 0 0.65rem 0;
+    }
+    .sidebar-toggle-btn {
+      margin-top: 0;
+      font-size: 0.78rem;
+      padding: 0.28rem 0.6rem;
+    }
+    .side-nav-brand {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #3d4d60;
+      margin: 0 0 0.25rem 0;
+      padding: 0 0.5rem;
+    }
+    .side-nav-muted {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin: 0 0 1rem 0;
+      padding: 0 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .side-nav-item {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      text-align: left;
+      margin: 0 0 0.2rem 0;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.88rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #3d4d60;
+      font-weight: 500;
+    }
+    .side-nav-item:hover {
+      background: var(--card);
+      border-color: var(--card-border);
+    }
+    .side-nav-item.is-active {
+      background: linear-gradient(180deg, #e3f2ff 0%, var(--accent-soft) 100%);
+      border-color: #9eb8d4;
+      font-weight: 600;
+    }
+    .dashboard-main {
+      flex: 1;
+      min-width: 0;
+      padding: 1rem 1.5rem 2rem;
+      max-width: 1200px;
+    }
+    .dashboard-panels .page-section {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    .dashboard-panels .page-section[hidden] {
+      display: none !important;
+    }
+    h1 { font-size: 1.35rem; color: #3d3a44; }
     .page-section > h2 {
       font-size: 1.15rem;
       margin: 0 0 0.35rem 0;
       color: #4a5f7a;
     }
-    .page-section-header > h2 { margin: 0; }
-    .section-toggle {
-      margin-top: 0;
-      min-width: 7.5rem;
-      font-size: 0.8rem;
-      padding: 0.28rem 0.65rem;
-      background: linear-gradient(180deg, #f6fbff 0%, #dcecf7 100%);
+    @media (max-width: 768px) {
+      .dashboard-layout { flex-direction: column; }
+      .dashboard-layout.sidebar-hidden .side-nav {
+        display: none;
+      }
+      .side-nav {
+        position: relative;
+        max-height: none;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        align-items: center;
+        padding: 0.75rem;
+      }
+      .side-nav-brand, .side-nav-muted { width: 100%; margin-bottom: 0; }
+      .side-nav-muted { margin-bottom: 0.5rem; }
+      .side-nav-item { width: auto; flex: 1 1 auto; min-width: 8rem; margin: 0; }
     }
-    .page-section-content[hidden] { display: none; }
     .section-help {
       color: var(--muted);
       font-size: 0.88rem;
@@ -114,6 +206,28 @@
       margin-top: 0.5rem;
       border-radius: 8px;
     }
+    /* Rendered markdown preview (CV / cover panels): headings + **bold**. */
+    div.tailor-md-preview.tailor-out {
+      white-space: normal;
+    }
+    .tailor-md-preview .tailor-md-h {
+      color: #446dad;
+      margin: 0.65rem 0 0.35rem 0;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    .tailor-md-preview h1.tailor-md-h { font-size: 1.15rem; }
+    .tailor-md-preview h2.tailor-md-h { font-size: 1.05rem; }
+    .tailor-md-preview h3.tailor-md-h { font-size: 0.98rem; }
+    .tailor-md-preview ul { margin: 0.35rem 0 0.5rem 1.25rem; padding: 0; }
+    .tailor-md-preview li { margin: 0.2rem 0; }
+    .tailor-md-preview p { margin: 0.35rem 0; }
+    .tailor-md-preview hr {
+      border: none;
+      border-top: 1px solid #c5d4e8;
+      margin: 0.75rem 0;
+    }
+    .tailor-md-preview strong { font-weight: 600; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); gap: 1rem; }
     .pdf-stack {
       display: block;
@@ -131,8 +245,31 @@
       width: 100%;
       box-sizing: border-box;
     }
+    #section-cv-cover.page-section {
+      max-width: none;
+    }
     #section-cv-cover textarea,
     #section-cv-cover input[type="text"] {
+      max-width: none;
+    }
+    /* Full-width tailor form + prompt (single column, no narrow grid cell). */
+    #section-job-analysis.page-section {
+      max-width: none;
+    }
+    #section-job-analysis .grid {
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+    #section-job-analysis .card,
+    #section-job-analysis .tailor-out,
+    #section-job-analysis .api-out,
+    #section-job-analysis .page-section-content {
+      max-width: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #section-job-analysis textarea,
+    #section-job-analysis input[type="text"] {
       max-width: none;
     }
     .muted { color: var(--muted); font-size: 0.8rem; }
@@ -196,7 +333,29 @@
   </style>
 </head>
 <body>
-  <h1>Career Ops dashboard</h1>
+  <div id="dashboard-layout-root" class="dashboard-layout">
+    <nav id="side-nav" class="side-nav" aria-label="Dashboard sections">
+      <p class="side-nav-brand">Career Ops</p>
+      <p class="side-nav-muted">Sections</p>
+      <button type="button" class="side-nav-item is-active" data-section="section-job-analysis">Job description analysis</button>
+      <button type="button" class="side-nav-item" data-section="section-cv-cover">CV &amp; cover output</button>
+      <button type="button" class="side-nav-item" data-section="section-knowledge-base">Knowledge base</button>
+      <button type="button" class="side-nav-item" data-section="section-operations">Operations &amp; monitoring</button>
+    </nav>
+    <div class="dashboard-main">
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('career-ops-sidebar-hidden') === '1') {
+            var root = document.getElementById('dashboard-layout-root');
+            if (root) root.classList.add('sidebar-hidden');
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
+    <div class="sidebar-toggle-row">
+      <button type="button" id="btn-toggle-sidebar" class="sidebar-toggle-btn" aria-expanded="true" aria-controls="side-nav">Hide sidebar</button>
+    </div>
   <div class="config-banner">
     <strong>Profile defaults</strong> (from <code>config/profile.yml</code> or example):
     min salary £{{ config_min_salary_gbp }}.
@@ -204,8 +363,9 @@
   </div>
   <p class="muted">Forms call JSON APIs; section panels show the latest JSON response for that action.</p>
 
+  <div id="dashboard-panels" class="dashboard-panels">
   <!-- 1) Knowledge Base -->
-  <div class="page-section" id="section-knowledge-base">
+  <div class="page-section" id="section-knowledge-base" hidden>
     <h2>Knowledge Base</h2>
     <p class="section-help">Capture notes and files so scoring and tailoring can reuse your context.</p>
     <div class="grid">
@@ -222,20 +382,26 @@
             Use it to separate kinds of snippets; the API stores it with the text.
           </p>
           <label>Entry type <input type="text" name="entry_type" value="note" /></label>
-          <button type="submit">POST /api/kb/add-text</button>
+          <button type="submit">Submit</button>
         </form>
       </section>
       <section class="card">
         <h3>Upload KB file</h3>
         <form id="form-kb-upload">
           <label>File (.docx, .pdf, .txt, .md) <input type="file" name="file" required /></label>
-          <button type="submit">POST /api/kb/upload</button>
+          <button type="submit">Submit</button>
         </form>
       </section>
     </div>
     <h3 style="margin-top: 1.25rem;">KB entries</h3>
     <p class="muted" style="margin: 0 0 0.5rem 0;">
       <code>GET /api/kb</code> — list; <code>GET /api/kb/{id}</code> — full text; <code>DELETE /api/kb/{id}</code> — remove row.
+      <strong>Cursor:</strong> <code>config/kb_digest.md</code> is rewritten automatically when you add, upload, or remove KB entries. <code>POST /api/kb/write-digest</code> forces a manual save.
+      <a href="/api/kb/export.md" download="kb_digest.md">Download digest</a>.
+    </p>
+    <p style="margin: 0 0 0.5rem 0;">
+      <button type="button" id="btn-kb-write-digest">Save KB digest</button>
+      <span class="muted" style="margin-left: 0.5rem;">Optional manual regenerate.</span>
     </p>
     <div class="jobs-board-wrap kb-board-wrap">
     <table>
@@ -263,14 +429,6 @@
       </tbody>
     </table>
     </div>
-    <dialog id="kb-view-dialog" aria-label="Knowledge base entry">
-      <div style="display:flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-        <strong id="kb-view-title">KB entry</strong>
-        <form method="dialog"><button type="submit">Close</button></form>
-      </div>
-      <pre id="kb-view-meta" class="muted" style="font-size: 0.8rem; margin: 0 0 0.5rem 0; white-space: pre-wrap;"></pre>
-      <pre id="kb-view-pre" style="white-space: pre-wrap; max-height: 65vh; overflow: auto; margin: 0; font-size: 0.9rem;"></pre>
-    </dialog>
     <h3 style="margin-top: 1rem;">API response</h3>
     <pre class="api-out" id="kb-api-out">(none yet)</pre>
   </div>
@@ -278,20 +436,28 @@
   <!-- 2) Job Description Analysis -->
   <div class="page-section" id="section-job-analysis">
     <h2>Job Description Analysis</h2>
-    <p class="section-help">Generate a paste-ready tailor prompt from the JD and your master CV.</p>
+    <p class="section-help">Generate a paste-ready tailor prompt from the JD. Default: assume you already <code>@</code> <code>config/master_profile.md</code> and <code>config/kb_digest.md</code> in Cursor so the prompt omits those bodies (JD + evidence table stay full).</p>
     <div class="grid">
       <section class="card">
         <h3>Tailor prompt</h3>
         <form id="form-tailor">
           <label>JD text <textarea name="jd_text" required></textarea></label>
-          <label>Master CV (optional override; auto-loaded from uploaded master CV if empty)
-            <textarea name="master_cv_markdown" placeholder="Leave empty to use uploaded master CV">{{ master_cv_prefill }}</textarea>
+          <label>Master CV (optional override; leave empty for <code>config/master_profile.md</code> or KB upload fallback)
+            <textarea name="master_cv_markdown" placeholder="Leave empty to use config/master_profile.md or KB">{{ master_cv_prefill }}</textarea>
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.65rem;">
+            <input type="checkbox" name="reference_master_in_cursor" id="tailor-ref-master" checked />
+            Omit master CV from paste (use <code>@</code> file in Cursor)
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" name="reference_kb_in_cursor" id="tailor-ref-kb" checked />
+            Omit KB bullets from paste (use <code>@config/kb_digest.md</code>; updated when KB changes)
           </label>
           <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.65rem;">
             <input type="checkbox" name="cover_requested" id="tailor-cover-requested" value="1" />
             Generate cover letter
           </label>
-          <button type="submit">POST /api/jobs/tailor-prompt</button>
+          <button type="submit">Submit</button>
         </form>
       </section>
     </div>
@@ -305,7 +471,7 @@
   </div>
 
   <!-- 3) CV & Cover Output -->
-  <div class="page-section" id="section-cv-cover">
+  <div class="page-section" id="section-cv-cover" hidden>
     <h2>CV &amp; Cover Output</h2>
     <p class="section-help">Paste Cursor chat JSON output below to generate final CV and cover markdown in this app.</p>
     <section class="card" style="margin-bottom: 1rem;">
@@ -319,7 +485,7 @@
           <input type="checkbox" name="ingest_cover_requested" id="ingest-cover-requested" />
           Expect cover letter in JSON (<code>tailored_cover_markdown</code>)
         </label>
-        <button type="submit">POST /api/jobs/ingest-cursor-response</button>
+        <button type="submit">Submit</button>
       </form>
     </section>
     <p class="muted" id="tailor-meta" style="margin: 0.35rem 0 0.5rem 0;">Workflow: copy-paste-cursor-chat</p>
@@ -327,21 +493,23 @@
     <div class="copy-row">
       <button type="button" id="copy-cv-btn" class="copy-btn">Copy CV</button>
     </div>
-    <pre class="tailor-out" id="tailor-cv-out">{{ latest_tailored_cv or 'Paste Cursor response above to populate this panel.' }}</pre>
+    <div class="tailor-out tailor-md-preview" id="tailor-cv-out">{% if latest_tailored_cv_html|default('', true) %}{{ latest_tailored_cv_html|safe }}{% else %}<p class="muted">Paste Cursor response above to populate this panel.</p>{% endif %}</div>
+    <textarea id="tailor-cv-raw" hidden aria-hidden="true" tabindex="-1" readonly>{{ latest_tailored_cv }}</textarea>
     <p class="section-help" style="margin-top:0.8rem;"><strong>Tailored Cover Letter (Markdown)</strong></p>
     <div class="copy-row">
       <button type="button" id="copy-cover-btn" class="copy-btn">Copy Cover</button>
     </div>
-    <pre class="tailor-out" id="tailor-cover-out">{{ latest_tailored_cover or 'Paste Cursor response above to populate this panel.' }}</pre>
+    <div class="tailor-out tailor-md-preview" id="tailor-cover-out">{% if latest_tailored_cover_html|default('', true) %}{{ latest_tailored_cover_html|safe }}{% else %}<p class="muted">Paste Cursor response above to populate this panel.</p>{% endif %}</div>
+    <textarea id="tailor-cover-raw" hidden aria-hidden="true" tabindex="-1" readonly>{{ latest_tailored_cover }}</textarea>
     <h3 style="margin-top: 1rem;">Export PDF</h3>
-    <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code>.</p>
+    <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code> (CV → <code>output/resumes</code>, cover → <code>output/covers</code>).</p>
     <div class="pdf-stack">
       <section class="card">
         <h4 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: #4a5f7a;">CV only</h4>
         <form id="form-pdf-cv">
           <label>Markdown (tailored CV) <textarea name="markdown_text" id="pdf-cv-markdown-text" rows="8" placeholder="Populated after ingest or paste here.">{{ latest_tailored_cv }}</textarea></label>
           <label>Output filename (optional) <input type="text" name="output_name" placeholder="tailored-cv.pdf" /></label>
-          <button type="submit">POST /api/cv/export-pdf (CV)</button>
+          <button type="submit">Submit</button>
         </form>
       </section>
       <section class="card">
@@ -349,7 +517,7 @@
         <form id="form-pdf-cover">
           <label>Markdown (tailored cover) <textarea name="markdown_text" id="pdf-cover-markdown-text" rows="8" placeholder="Populated after ingest when cover is included, or paste here.">{{ latest_tailored_cover }}</textarea></label>
           <label>Output filename (optional) <input type="text" name="output_name" placeholder="tailored-cover.pdf" /></label>
-          <button type="submit">POST /api/cv/export-pdf (cover)</button>
+          <button type="submit">Submit</button>
         </form>
       </section>
     </div>
@@ -357,24 +525,10 @@
     <pre class="api-out" id="cv-api-out">(none yet)</pre>
   </div>
 
-  <!-- 4) Applications Tracker -->
-  <div class="page-section" id="section-applications">
-    <h2>Applications Tracker</h2>
-    <p class="section-help">Log applications and review recent scraped jobs from the database.</p>
-    <section class="card" style="margin-bottom: 1rem;">
-      <h3>Add application</h3>
-      <form id="form-app">
-        <label>Company <input type="text" name="company" required /></label>
-        <label>Role <input type="text" name="role" required /></label>
-        <label>Link <input type="text" name="link" required /></label>
-        <label>Date applied <input type="text" name="date_applied" required placeholder="2026-04-09" /></label>
-        <label>Status <input type="text" name="status" /></label>
-        <label>CV version <input type="text" name="cv_version" /></label>
-        <label>Cover version <input type="text" name="cover_version" /></label>
-        <label>Notes <textarea name="notes"></textarea></label>
-        <button type="submit">POST /api/applications/add</button>
-      </form>
-    </section>
+  <!-- 4) Operations & Monitoring -->
+  <div class="page-section" id="section-operations" hidden>
+    <h2>Operations &amp; Monitoring</h2>
+    <p class="section-help">Scraped jobs board, application log, run scrapes, inspect API responses, and view the monitor agent snapshot.</p>
     <h3>Recent jobs</h3>
     <div class="jobs-board-wrap">
     <table>
@@ -400,6 +554,20 @@
       </tbody>
     </table>
     </div>
+    <section class="card" style="margin-bottom: 1rem; margin-top: 1.25rem;">
+      <h3>Add application</h3>
+      <form id="form-app">
+        <label>Company <input type="text" name="company" required /></label>
+        <label>Role <input type="text" name="role" required /></label>
+        <label>Link <input type="text" name="link" required /></label>
+        <label>Date applied <input type="date" name="date_applied" required title="Application date" /></label>
+        <label>Status <input type="text" name="status" /></label>
+        <label>CV version <input type="text" name="cv_version" /></label>
+        <label>Cover version <input type="text" name="cover_version" /></label>
+        <label>Notes <textarea name="notes"></textarea></label>
+        <button type="submit">Submit</button>
+      </form>
+    </section>
     <h3 style="margin-top: 1.25rem;">Recent applications</h3>
     <p class="muted" style="margin: 0 0 0.5rem 0;">
       Change the status dropdown then click <strong>Save</strong> to <code>PATCH /api/applications/{id}</code>.
@@ -440,27 +608,46 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3 style="margin-top: 1rem;">API response</h3>
+    <h3 style="margin-top: 1rem;">Applications API response</h3>
     <pre class="api-out" id="app-api-out">(none yet)</pre>
-  </div>
-
-  <!-- 5) Operations & Monitoring -->
-  <div class="page-section" id="section-operations">
-    <h2>Operations &amp; Monitoring</h2>
-    <p class="section-help">Run scrapes, inspect raw API responses, and view the monitor agent snapshot.</p>
-    <section class="card" style="margin-bottom: 1rem;">
+    <section class="card" style="margin-bottom: 1rem; margin-top: 1.25rem;">
       <h3>Run scrape</h3>
+      <p class="muted" style="margin: 0 0 0.5rem 0;">Presets load from <code>config/scrape_sources.yml</code> (same list as the daily scheduler).</p>
+      <script type="application/json" id="scrape-source-urls-json">{{ scrape_source_urls | tojson }}</script>
       <form id="form-scrape">
-        <label>URLs (one per line) <textarea name="urls" required placeholder="https://..."></textarea></label>
+        <label>URL preset
+          <select id="scrape-url-preset" name="scrape_url_preset">
+            <option value="">— Manual: paste below —</option>
+            {% if scrape_source_urls %}
+            <option value="all">All URLs from config ({{ scrape_source_urls | length }})</option>
+            {% for u in scrape_source_urls %}
+            <option value="{{ loop.index0 }}">{{ loop.index }}. {{ u[:70] }}{% if u|length > 70 %}…{% endif %}</option>
+            {% endfor %}
+            {% endif %}
+          </select>
+        </label>
+        <label>URLs (one per line) <textarea name="urls" id="scrape-urls-textarea" required placeholder="https://..."></textarea></label>
         <label>Min salary GBP <input type="number" name="min_salary_gbp" value="{{ config_min_salary_gbp }}" /></label>
-        <button type="submit">POST /api/scrape/run</button>
+        <button type="submit">Submit</button>
       </form>
     </section>
-    <h3>API response</h3>
+    <h3>Operations API response</h3>
     <pre class="api-out" id="ops-api-out">(none yet)</pre>
     <h3 style="margin-top: 1.25rem;">Monitor snapshot</h3>
     <pre class="snapshot">{{ monitor_json }}</pre>
   </div>
+  </div><!-- #dashboard-panels -->
+    </div><!-- .dashboard-main -->
+  </div><!-- .dashboard-layout -->
+
+  <dialog id="kb-view-dialog" aria-label="Knowledge base entry">
+    <div style="display:flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+      <strong id="kb-view-title">KB entry</strong>
+      <form method="dialog"><button type="submit">Close</button></form>
+    </div>
+    <pre id="kb-view-meta" class="muted" style="font-size: 0.8rem; margin: 0 0 0.5rem 0; white-space: pre-wrap;"></pre>
+    <pre id="kb-view-pre" style="white-space: pre-wrap; max-height: 65vh; overflow: auto; margin: 0; font-size: 0.9rem;"></pre>
+  </dialog>
 
   <script>
     const kbApiOut = document.getElementById('kb-api-out');
@@ -470,6 +657,8 @@
     const opsApiOut = document.getElementById('ops-api-out');
     const tailorCvOut = document.getElementById('tailor-cv-out');
     const tailorCoverOut = document.getElementById('tailor-cover-out');
+    const tailorCvRaw = document.getElementById('tailor-cv-raw');
+    const tailorCoverRaw = document.getElementById('tailor-cover-raw');
     const tailorMeta = document.getElementById('tailor-meta');
     const cursorPromptOut = document.getElementById('cursor-prompt-out');
     const copyPromptBtn = document.getElementById('copy-prompt-btn');
@@ -486,72 +675,94 @@
     const kbViewTitle = document.getElementById('kb-view-title');
 
     /**
-     * Reorder top-level sections for a faster application workflow.
+     * Order section panels inside ``#dashboard-panels`` (job → CV → KB → operations).
      */
     function reorderSections() {
-      const body = document.body;
+      const panels = document.getElementById('dashboard-panels');
       const sectionJob = document.getElementById('section-job-analysis');
       const sectionCv = document.getElementById('section-cv-cover');
       const sectionKb = document.getElementById('section-knowledge-base');
-      const sectionApps = document.getElementById('section-applications');
       const sectionOps = document.getElementById('section-operations');
-      if (!body || !sectionJob || !sectionCv || !sectionKb) return;
+      if (!panels || !sectionJob || !sectionCv || !sectionKb || !sectionOps) return;
 
-      const ordered = [sectionJob, sectionCv, sectionKb, sectionApps, sectionOps]
-        .filter(Boolean);
+      const ordered = [sectionJob, sectionCv, sectionKb, sectionOps];
       for (const section of ordered) {
-        body.appendChild(section);
+        panels.appendChild(section);
       }
     }
 
     /**
-     * Make each top-level dashboard section collapsible and persist its state.
+     * Left nav: show one ``.page-section`` at a time; optional URL hash ``#section-...``.
      */
-    function initCollapsibleSections() {
-      const sections = document.querySelectorAll('.page-section');
-      for (const section of sections) {
-        const heading = section.querySelector(':scope > h2');
-        if (!heading || !section.id) continue;
+    function initSideTabs() {
+      const nav = document.querySelector('.side-nav');
+      const panelsRoot = document.getElementById('dashboard-panels');
+      if (!nav || !panelsRoot) return;
 
-        const storageKey = 'career-ops-section:' + section.id;
-        const header = document.createElement('div');
-        header.className = 'page-section-header';
+      const panels = panelsRoot.querySelectorAll('.page-section');
+      const buttons = nav.querySelectorAll('.side-nav-item[data-section]');
 
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = 'section-toggle';
-
-        const content = document.createElement('div');
-        content.className = 'page-section-content';
-        content.id = section.id + '-content';
-
-        section.insertBefore(header, heading);
-        header.appendChild(heading);
-        header.appendChild(toggleBtn);
-
-        while (header.nextSibling) {
-          content.appendChild(header.nextSibling);
-        }
-        section.appendChild(content);
-
-        function applyCollapsedState(collapsed) {
-          content.hidden = collapsed;
-          toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-          toggleBtn.setAttribute('aria-controls', content.id);
-          toggleBtn.textContent = collapsed ? 'Expand section' : 'Collapse section';
-        }
-
-        applyCollapsedState(true);
-
-        toggleBtn.addEventListener('click', () => {
-          const collapsed = !content.hidden;
-          applyCollapsedState(collapsed);
+      function show(sectionId) {
+        panels.forEach((p) => {
+          p.hidden = p.id !== sectionId;
         });
+        buttons.forEach((b) => {
+          b.classList.toggle('is-active', b.getAttribute('data-section') === sectionId);
+        });
+        try {
+          history.replaceState(null, '', '#' + sectionId);
+        } catch (e) { /* ignore */ }
       }
+
+      buttons.forEach((b) => {
+        b.addEventListener('click', () => show(b.getAttribute('data-section')));
+      });
+
+      window.addEventListener('hashchange', () => {
+        const id = (location.hash || '').replace(/^#/, '');
+        if (Array.from(buttons).some((b) => b.getAttribute('data-section') === id)) {
+          show(id);
+        }
+      });
+
+      const hash = (location.hash || '').replace(/^#/, '');
+      const valid = Array.from(buttons).some((b) => b.getAttribute('data-section') === hash);
+      show(valid ? hash : 'section-job-analysis');
     }
 
     reorderSections();
-    initCollapsibleSections();
+    initSideTabs();
+
+    /** Persist sidebar visibility in ``localStorage`` (key ``career-ops-sidebar-hidden``). */
+    const _SIDEBAR_LS = 'career-ops-sidebar-hidden';
+
+    function applySidebarHidden(hidden) {
+      const root = document.getElementById('dashboard-layout-root');
+      const btn = document.getElementById('btn-toggle-sidebar');
+      if (!root || !btn) return;
+      root.classList.toggle('sidebar-hidden', hidden);
+      btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+      btn.textContent = hidden ? 'Show sidebar' : 'Hide sidebar';
+      try {
+        localStorage.setItem(_SIDEBAR_LS, hidden ? '1' : '0');
+      } catch (e) { /* ignore */ }
+    }
+
+    function initSidebarToggle() {
+      const root = document.getElementById('dashboard-layout-root');
+      const btn = document.getElementById('btn-toggle-sidebar');
+      if (!root || !btn) return;
+      var hidden = false;
+      try {
+        hidden = localStorage.getItem(_SIDEBAR_LS) === '1';
+      } catch (e) { /* ignore */ }
+      applySidebarHidden(hidden);
+      btn.addEventListener('click', function () {
+        applySidebarHidden(!root.classList.contains('sidebar-hidden'));
+      });
+    }
+
+    initSidebarToggle();
 
     /** Escape text for safe insertion into HTML when building table rows from JSON. */
     function escapeHtml(s) {
@@ -675,10 +886,24 @@
       showResponse(cvApiOut, res.status + ' ' + res.statusText + '\n' + pretty);
       if (!res.ok || !parsed) return;
       if (tailorCvOut && typeof parsed.tailored_cv_markdown === 'string') {
-        tailorCvOut.textContent = parsed.tailored_cv_markdown;
+        if (tailorCvRaw) tailorCvRaw.value = parsed.tailored_cv_markdown;
+        const cvHtml = typeof parsed.tailored_cv_html === 'string' ? parsed.tailored_cv_html : '';
+        try {
+          tailorCvOut.innerHTML = cvHtml || '<p class="muted">(preview unavailable)</p>';
+        } catch (err) {
+          tailorCvOut.textContent = parsed.tailored_cv_markdown;
+          showResponse(cvApiOut, (cvApiOut.textContent || '') + '\nPreview HTML error: ' + String(err));
+        }
       }
       if (tailorCoverOut && typeof parsed.tailored_cover_markdown === 'string') {
-        tailorCoverOut.textContent = parsed.tailored_cover_markdown;
+        if (tailorCoverRaw) tailorCoverRaw.value = parsed.tailored_cover_markdown;
+        const covHtml = typeof parsed.tailored_cover_html === 'string' ? parsed.tailored_cover_html : '';
+        try {
+          tailorCoverOut.innerHTML = covHtml || '<p class="muted">(preview unavailable)</p>';
+        } catch (err) {
+          tailorCoverOut.textContent = parsed.tailored_cover_markdown;
+          showResponse(cvApiOut, (cvApiOut.textContent || '') + '\nPreview HTML error: ' + String(err));
+        }
       }
       if (pdfCvMarkdownText && typeof parsed.tailored_cv_markdown === 'string') {
         pdfCvMarkdownText.value = parsed.tailored_cv_markdown;
@@ -716,11 +941,19 @@
       return ok;
     }
 
+    /** Plain text to copy from a node (textarea value or element textContent). */
+    function copySourceText(el) {
+      if (!el) return '';
+      const tag = el.tagName;
+      if (tag === 'TEXTAREA' || tag === 'INPUT') return el.value || '';
+      return el.textContent || '';
+    }
+
     /** Copy text to clipboard and update button label briefly. */
     async function copyText(el, btn, successLabel) {
       if (!el || !btn) return;
       const original = btn.textContent;
-      const text = el.textContent || '';
+      const text = copySourceText(el);
       if (!text.trim()) {
         btn.textContent = 'Nothing to copy';
         setTimeout(() => { btn.textContent = original; }, 1200);
@@ -765,11 +998,26 @@
       if (res.ok) await refreshKbTable();
     });
 
+    const btnKbWriteDigest = document.getElementById('btn-kb-write-digest');
+    if (btnKbWriteDigest) {
+      btnKbWriteDigest.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/kb/write-digest', { method: 'POST' });
+          const txt = await res.text();
+          showResponse(kbApiOut, formatResponse(res, txt));
+        } catch (err) {
+          showResponse(kbApiOut, 'write-digest failed: ' + String(err));
+        }
+      });
+    }
+
     document.getElementById('form-tailor').addEventListener('submit', async (e) => {
       e.preventDefault();
       const t = e.target;
       /** Whether the tailor prompt should ask for a cover letter as well as CV. */
       const coverRequested = !!(t.cover_requested && t.cover_requested.checked);
+      const refMaster = !!(t.reference_master_in_cursor && t.reference_master_in_cursor.checked);
+      const refKb = !!(t.reference_kb_in_cursor && t.reference_kb_in_cursor.checked);
       const res = await fetch('/api/jobs/tailor-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -777,6 +1025,8 @@
           jd_text: t.jd_text.value,
           master_cv_markdown: t.master_cv_markdown.value,
           cover_requested: coverRequested,
+          reference_master_in_cursor: refMaster,
+          reference_kb_in_cursor: refKb,
         }),
       });
       const txt = await res.text();
@@ -799,6 +1049,32 @@
       const txt = await res.text();
       applyIngestPanels(res, txt);
     });
+
+    (function initScrapeUrlPreset() {
+      const dataEl = document.getElementById('scrape-source-urls-json');
+      const preset = document.getElementById('scrape-url-preset');
+      const ta = document.getElementById('scrape-urls-textarea');
+      if (!preset || !ta) return;
+      let urlList = [];
+      if (dataEl) {
+        try {
+          urlList = JSON.parse(dataEl.textContent || '[]');
+        } catch (err) { /* ignore */ }
+      }
+      if (!Array.isArray(urlList)) urlList = [];
+      preset.addEventListener('change', function () {
+        const v = preset.value;
+        if (v === '') return;
+        if (v === 'all') {
+          ta.value = urlList.join('\n');
+        } else {
+          const i = parseInt(v, 10);
+          if (!isNaN(i) && urlList[i]) {
+            ta.value = urlList[i];
+          }
+        }
+      });
+    })();
 
     document.getElementById('form-scrape').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -840,6 +1116,7 @@
       postJson('/api/cv/export-pdf', {
         markdown_text: t.markdown_text.value,
         output_name: t.output_name.value || null,
+        document: 'cover',
       }, cvApiOut);
     });
 
@@ -847,10 +1124,10 @@
       copyPromptBtn.addEventListener('click', () => copyText(cursorPromptOut, copyPromptBtn, 'Copied Prompt'));
     }
     if (copyCvBtn) {
-      copyCvBtn.addEventListener('click', () => copyText(tailorCvOut, copyCvBtn, 'Copied CV'));
+      copyCvBtn.addEventListener('click', () => copyText(tailorCvRaw || tailorCvOut, copyCvBtn, 'Copied CV'));
     }
     if (copyCoverBtn) {
-      copyCoverBtn.addEventListener('click', () => copyText(tailorCoverOut, copyCoverBtn, 'Copied Cover'));
+      copyCoverBtn.addEventListener('click', () => copyText(tailorCoverRaw || tailorCoverOut, copyCoverBtn, 'Copied Cover'));
     }
 
     const jobsBoardTbody = document.getElementById('jobs-board-tbody');

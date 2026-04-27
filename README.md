@@ -67,24 +67,26 @@ More detail:
 For a new user, the fastest path is:
 
 1. Open the dashboard.
-2. In `Job Description Analysis`, paste a JD and generate the tailor prompt.
-3. In `CV & Cover Output`, keep the generated prompt ready for Cursor.
-4. In `Knowledge Base`, upload your master CV.
-   - If the filename contains both `master` and `cv`, the app will prefer it as the default master CV for tailoring.
-5. Copy the generated prompt into Cursor chat.
-6. Paste Cursor's JSON response into `Ingest Cursor response`.
+2. Add [`config/master_profile.md`](config/master_profile.md) (canonical master CV Markdown) **or** upload a master CV in **Knowledge Base** (filenames containing both `master` and `cv` are preferred as fallback).
+3. Add KB notes/files as needed. The app **rewrites `config/kb_digest.md` automatically** after each KB add, upload, or delete. You can still use **Save KB digest** (or `POST /api/kb/write-digest`) to regenerate manually.
+4. In **Job Description Analysis**, paste a JD and submit **Tailor prompt** (defaults omit inlined CV/KB; see below).
+5. In Cursor, open **one** chat thread. Attach once: `@config/master_profile.md` and `@config/kb_digest.md`. Paste each app-generated prompt for each job; re-attach those files when context is full or quality drops.
+6. Paste Cursor's JSON response into **Ingest Cursor response**.
 7. Review the tailored CV / cover markdown in the app.
 8. Export the final PDF.
 
+**Master CV resolution order:** non-empty tailor textarea → `config/master_profile.md` → latest suitable KB upload.
+
+**Tailor prompt modes (JSON body):** `reference_master_in_cursor` and `reference_kb_in_cursor` default to `true`. The prompt still includes the **full verbatim JD**, **JD signal extracts**, and the full **keyword ↔ evidence** table; only the duplicate **Master CV** and/or **KB bullet** bodies are omitted so you do not paste them every time. Set either flag to `false` to inline that block again (e.g. fresh thread without `@`).
+
+The API response includes rough `approx_prompt_chars` / `approx_prompt_tokens` for the **final** paste (including JSON output instructions).
+
 Recommended real usage order:
 
-1. create `config/profile.yml`
-2. upload the master CV to Knowledge Base
-3. paste a JD
-4. generate the prompt
-5. run it in Cursor
-6. ingest Cursor JSON
-7. export PDF
+1. Create `config/profile.yml` and `config/master_profile.md`
+2. Populate KB (digest file updates on each change; optional manual **Save KB digest**)
+3. `@` master + digest once per Cursor thread, then paste a JD prompt per job
+4. Ingest Cursor JSON and export PDF
 
 ## Main Features
 
@@ -121,8 +123,10 @@ Notes:
 
 - database: `data/career_ops.db`
 - uploaded KB files: `data/uploads/`
-- exported PDFs: `output/resumes/`
+- exported PDFs: `output/resumes/` (CV), `output/covers/` (cover letter)
 - local profile: `config/profile.yml`
+- master CV (recommended): `config/master_profile.md`
+- KB digest for Cursor `@`: `config/kb_digest.md` (auto-updated on KB add/upload/delete)
 - optional env overrides: `.env`
 
 The app creates `data/` and `output/` as needed.
@@ -133,6 +137,8 @@ The app creates `data/` and `output/` as needed.
 |----------|---------|
 | `GET /api/kb` | List KB entries (`limit`, `offset`, optional `entry_type`) |
 | `GET /api/kb/{id}` | Read one KB row including full `content` |
+| `GET /api/kb/export.md` | Download Markdown digest of all KB rows |
+| `POST /api/kb/write-digest` | Write `config/kb_digest.md` from KB table |
 | `DELETE /api/kb/{id}` | Delete a KB row |
 | `POST /api/jobs/score` | ATS-style score (`jd_text`, optional `target_roles`, `required_salary_gbp`) |
 | `POST /api/jobs/tailor-prompt` | Build the Cursor-ready prompt |
@@ -142,7 +148,7 @@ The app creates `data/` and `output/` as needed.
 
 ## Troubleshooting
 
-- **No master CV found**: upload a CV first in `Knowledge Base`, or paste one into the tailor form override.
+- **No master CV found**: add `config/master_profile.md`, or upload a CV in **Knowledge Base**, or paste into the tailor form override.
 - **Prompt looks fine but output is weak**: make sure the uploaded master CV is the latest intended version and the JD text is complete.
 - **LinkedIn scrape returns nothing**: try a non-LinkedIn board or paste the JD manually.
 - **Docker changes not reflected**: confirm `./config`, `./data`, and `./output` are mounted and you edited files in the repo root.

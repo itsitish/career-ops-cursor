@@ -10,7 +10,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 # Project root: .../career-ops-cursor (parent of app/)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -96,6 +97,129 @@ def _connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 # --- Jobs CRUD ---
 
+# Strip common tracking params so the same job URL scraped twice still matches one row.
+_TRACKING_QUERY_KEYS = frozenset(
+    {"fbclid", "gclid", "mc_eid", "_ga", "igshid"}
+)
+
+
+def normalize_job_link(url: str) -> str:
+    """
+    Canonicalize a job listing URL for deduplication.
+
+    Lowercases scheme and host, trims trailing slashes on the path, drops ``utm_*``
+    and other tracking query keys, strips fragments, and sorts remaining query pairs.
+    """
+    u = (url or "").strip()
+    if not u:
+        return ""
+    try:
+        parsed = urlparse(u)
+        scheme = (parsed.scheme or "https").lower()
+        if scheme not in ("http", "https"):
+            scheme = "https"
+        netloc = (parsed.netloc or "").lower()
+        path = parsed.path or ""
+        if not path.startswith("/"):
+            path = "/" + path
+        if len(path) > 1 and path.endswith("/"):
+            path = path.rstrip("/")
+        pairs = parse_qsl(parsed.query, keep_blank_values=True)
+        filtered: list[tuple[str, str]] = []
+        for k, v in pairs:
+            kl = k.lower()
+            if kl.startswith("utm_") or kl in _TRACKING_QUERY_KEYS:
+                continue
+            filtered.append((k, v))
+        filtered.sort(key=lambda x: (x[0].lower(), x[1]))
+        query = urlencode(filtered)
+        return urlunparse((scheme, netloc, path, "", query, ""))
+    except Exception:
+        return u
+
+
+def job_find_for_upsert(listing_link: str, db_path: Optional[Path] = None) -> Optional[dict[str, Any]]:
+    """
+    Find an existing job row for the same listing as ``listing_link``.
+
+    Matches by normalized URL so ``http`` vs ``https``, trailing slashes, or ``utm_``
+    params still resolve to the same row. Falls back to a bounded scan for legacy rows
+    stored before normalization.
+    """
+    raw = (listing_link or "").strip()
+    if not raw:
+        return None
+    canon = normalize_job_link(raw) or raw
+
+    row = job_get_by_link(canon, db_path)
+    if row:
+        return dict(row)
+    row = job_get_by_link(raw, db_path)
+    if row:
+        return dict(row)
+
+    conn = _connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT * FROM jobs ORDER BY id DESC LIMIT 5000"
+        ).fetchall()
+        for r in rows:
+            if normalize_job_link(str(r["link"])) == canon:
+                return dict(r)
+    finally:
+        conn.close()
+    return None
+
+
+def job_upsert_from_listing(
+    listing: Dict[str, Any],
+    *,
+    insert_status: str = "scraped",
+    db_path: Optional[Path] = None,
+) -> Optional[str]:
+    """
+    Insert or update one scraped listing using normalized URL deduplication.
+
+    Returns:
+        ``\"inserted\"``, ``\"updated\"``, or ``None`` if ``link`` is missing.
+    """
+    link_raw = (listing.get("link") or "").strip()
+    if not link_raw:
+        return None
+    link = normalize_job_link(link_raw) or link_raw
+    company = str(listing.get("company") or "")
+    role = str(listing.get("role") or "Unknown role")
+    salary_text = listing.get("salary_text")
+    location = listing.get("location")
+    source = listing.get("source")
+    jd_text = listing.get("jd_text")
+    existing = job_find_for_upsert(link_raw, db_path)
+    if existing:
+        job_update(
+            int(existing["id"]),
+            company=company or None,
+            role=role,
+            link=link,
+            salary_text=salary_text,
+            location=location,
+            source=source,
+            jd_text=jd_text,
+            db_path=db_path,
+        )
+        return "updated"
+    job_insert(
+        company=company or "Unknown",
+        role=role,
+        link=link,
+        salary_text=salary_text,
+        location=location,
+        source=source,
+        jd_text=jd_text,
+        status=insert_status,
+        db_path=db_path,
+    )
+    return "inserted"
+
 
 def job_insert(
     company: str,
@@ -169,22 +293,42 @@ def job_list(
     status: Optional[str] = None,
     db_path: Optional[Path] = None,
 ) -> list[dict[str, Any]]:
-    """List jobs with optional ``status`` filter."""
+    """
+    List jobs with optional ``status`` filter, newest first.
+
+    Deduplicates by :func:`normalize_job_link` so the Recent jobs board does not show
+    multiple rows for the same listing (legacy duplicates or URL variants). Fetches
+    extra rows from SQLite then trims to ``limit`` unique canonical links.
+    """
+    fetch_cap = min(max(limit * 10, limit + 20), 8000)
     conn = _connect(db_path)
     try:
         if status is not None:
             rows = conn.execute(
                 "SELECT * FROM jobs WHERE status = ? ORDER BY id DESC LIMIT ? OFFSET ?",
-                (status, limit, offset),
+                (status, fetch_cap, offset),
             ).fetchall()
         else:
             rows = conn.execute(
                 "SELECT * FROM jobs ORDER BY id DESC LIMIT ? OFFSET ?",
-                (limit, offset),
+                (fetch_cap, offset),
             ).fetchall()
-        return [dict(r) for r in rows]
     finally:
         conn.close()
+
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        d = dict(r)
+        raw_link = str(d.get("link") or "")
+        key = normalize_job_link(raw_link) or raw_link
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(d)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def job_update(
@@ -509,6 +653,18 @@ class Storage:
     def job_get_by_link(self, link: str) -> Optional[dict[str, Any]]:
         """Return the job row matching ``link`` using the facade's ``db_path``."""
         return job_get_by_link(link, db_path=self.db_path)
+
+    def job_find_for_upsert(self, listing_link: str) -> Optional[dict[str, Any]]:
+        """Resolve an existing job row for ``listing_link`` (normalized matching)."""
+        return job_find_for_upsert(listing_link, db_path=self.db_path)
+
+    def job_upsert_from_listing(
+        self, listing: Dict[str, Any], *, insert_status: str = "scraped"
+    ) -> Optional[str]:
+        """Insert or update one scraped listing using this facade's ``db_path``."""
+        return job_upsert_from_listing(
+            listing, insert_status=insert_status, db_path=self.db_path
+        )
 
     def job_list(self, **kwargs: Any) -> list[dict[str, Any]]:
         """List jobs via the facade's configured database path."""

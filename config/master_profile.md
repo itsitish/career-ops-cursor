@@ -41,7 +41,7 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law
 - Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights
 - Architected PySpark pipelines on AWS Glue to produce analytics-ready datasets for multiple ML applications; built aggregation jobs feeding TimescaleDB hypertables for downstream training and inference
-- Distributed a linear regression model — packaged as a Python library loaded into the Spark runtime — across ~2 years of backdated hourly data for ~10,000 users using PySpark on AWS Glue, enabling parallelised, scheduled inference at scale
+- Distributed a Python-packaged linear regression model across large-scale half-hourly smart meter streams using PySpark on AWS Glue, processing ~350M+ interval records for scheduled batch inference at scale
 - Designed a real-time mould-risk detection system using high-performance SQL materialised views and validated thresholds to flag at-risk properties
 - Wrote complex SQL queries to aggregate, validate, and transform smart meter data across multiple source systems, underpinning model training and compliance workflows
 - Achieved a 99% reduction in infrastructure costs and 8x improvement in inference latency by re-architecting a monolithic NILM server into a three-stage serverless pipeline (extraction to inference to persistence), each stage an independent AWS Lambda with parallel, independently scalable execution
@@ -51,8 +51,8 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Modernised ML delivery with CI/CD pipelines and automated code quality standards, reducing production regressions
 - Designed an agentic testing harness using GPT agents to automate integration testing workflows and surface results to Slack; packaged as reusable Cursor skills for team-wide adoption
 - Published BI dashboards in QuickSight for model monitoring and stakeholder visibility
-- Contributed modular React components and Jest unit tests to the internal web application
 - Acted as Scrum Master and technical mentor; defined team roadmap and upskilled members in AWS, MLOps, and scalable Python; led technical hiring from competency definition through interviews
+- Contributed modular React components and Jest unit tests to the internal web application
 
 ### Founding Engineer, TripSync, Jul 2021 - Dec 2021, Agra, India
 

@@ -508,18 +508,6 @@
       </form>
     </section>
     <p class="muted" id="tailor-meta" style="margin: 0.35rem 0 0.5rem 0;">Workflow: copy-paste-cursor-chat</p>
-    <p class="section-help"><strong>Tailored CV (Markdown)</strong></p>
-    <div class="copy-row">
-      <button type="button" id="copy-cv-btn" class="copy-btn">Copy CV</button>
-    </div>
-    <div class="tailor-out tailor-md-preview" id="tailor-cv-out">{% if latest_tailored_cv_html|default('', true) %}{{ latest_tailored_cv_html|safe }}{% else %}<p class="muted">Paste Cursor response above to populate this panel.</p>{% endif %}</div>
-    <textarea id="tailor-cv-raw" hidden aria-hidden="true" tabindex="-1" readonly>{{ latest_tailored_cv }}</textarea>
-    <p class="section-help" style="margin-top:0.8rem;"><strong>Tailored Cover Letter (Markdown)</strong></p>
-    <div class="copy-row">
-      <button type="button" id="copy-cover-btn" class="copy-btn">Copy Cover</button>
-    </div>
-    <div class="tailor-out tailor-md-preview" id="tailor-cover-out">{% if latest_tailored_cover_html|default('', true) %}{{ latest_tailored_cover_html|safe }}{% else %}<p class="muted">Paste Cursor response above to populate this panel.</p>{% endif %}</div>
-    <textarea id="tailor-cover-raw" hidden aria-hidden="true" tabindex="-1" readonly>{{ latest_tailored_cover }}</textarea>
     <h3 style="margin-top: 1rem;">Export PDF</h3>
     <p class="muted" style="margin: 0 0 0.75rem 0;">After a successful ingest, CV and cover fields fill from the panels above. Each form calls <code>POST /api/cv/export-pdf</code> (CV to <code>output/resumes</code>, cover to <code>output/covers</code>).</p>
     <div class="pdf-stack">
@@ -576,11 +564,22 @@
     <section class="card" style="margin-bottom: 1rem; margin-top: 1.25rem;">
       <h3>Add application</h3>
       <form id="form-app">
-        <label>Company <input type="text" name="company" required /></label>
-        <label>Role <input type="text" name="role" required /></label>
-        <label>Link <input type="text" name="link" required /></label>
-        <label>Date applied <input type="date" name="date_applied" required title="Application date" /></label>
-        <label>Status <input type="text" name="status" /></label>
+        <label>Company <input type="text" name="company" /></label>
+        <label>Role <input type="text" name="role" /></label>
+        <label>Link <input type="text" name="link" /></label>
+        <label>Date applied <input type="date" name="date_applied" title="Application date" /></label>
+        <label>Status
+          <select name="status">
+            <option value="">(none)</option>
+            <option value="applied">applied</option>
+            <option value="in_review">in_review</option>
+            <option value="phone_screen">phone_screen</option>
+            <option value="interview">interview</option>
+            <option value="offer">offer</option>
+            <option value="rejected">rejected</option>
+            <option value="withdrawn">withdrawn</option>
+          </select>
+        </label>
         <label>CV version <input type="text" name="cv_version" /></label>
         <label>Cover version <input type="text" name="cover_version" /></label>
         <label>Notes <textarea name="notes"></textarea></label>
@@ -603,9 +602,9 @@
         {% for a in applications %}
         <tr data-app-row="{{ a.id }}">
           <td>{{ a.id }}</td>
-          <td>{{ a.company }}</td>
-          <td>{{ a.role }}</td>
-          <td>{{ a.date_applied }}</td>
+          <td>{{ a.company or '—' }}</td>
+          <td>{{ a.role or '—' }}</td>
+          <td>{{ a.date_applied or '—' }}</td>
           <td>
             <select class="app-status-select" data-app-status="{{ a.id }}">
               <option value="">(none)</option>

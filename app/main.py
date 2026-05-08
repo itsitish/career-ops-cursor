@@ -850,16 +850,12 @@ async def api_scrape_run(
 
 @app.post("/api/applications/add")
 async def api_applications_add(payload: Dict[str, Any] = Body(...)) -> JSONResponse:
-    """Insert an application row from JSON body fields."""
-    required = ("company", "role", "link", "date_applied")
-    for key in required:
-        if key not in payload:
-            raise HTTPException(status_code=400, detail=f"missing {key}")
+    """Insert an application row from JSON body fields; all form fields are optional."""
     app_id = storage.application_insert(
-        company=str(payload["company"]),
-        role=str(payload["role"]),
-        link=str(payload["link"]),
-        date_applied=str(payload["date_applied"]),
+        company=str(payload.get("company") or ""),
+        role=str(payload.get("role") or ""),
+        link=str(payload.get("link") or ""),
+        date_applied=str(payload.get("date_applied") or ""),
         status=payload.get("status"),
         cv_version=payload.get("cv_version"),
         cover_version=payload.get("cover_version"),

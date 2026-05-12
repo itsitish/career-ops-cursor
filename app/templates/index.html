@@ -117,16 +117,27 @@
       height: 2.7rem;
       padding: 0;
       border-radius: 50%;
-      border: 1px solid var(--card-border);
-      background: var(--surface);
-      color: #3d4d60;
+      border: 1px solid #0d2847;
+      background: #153e75;
+      color: #f0f5fc;
       font-size: 1.15rem;
       line-height: 1;
       cursor: pointer;
-      box-shadow: 0 2px 12px rgba(30, 50, 90, 0.15);
+      box-shadow: 0 2px 12px rgba(13, 40, 71, 0.35);
     }
-    .scroll-top-btn:hover { filter: brightness(1.04); }
+    .scroll-top-btn:hover {
+      background: #1a4d8f;
+      border-color: #0a1f38;
+      filter: none;
+    }
     .scroll-top-btn[hidden] { display: none !important; }
+    .td-app-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+      vertical-align: top;
+    }
     .dashboard-main {
       flex: 1;
       min-width: 0;
@@ -586,16 +597,21 @@
         <button type="submit">Submit</button>
       </form>
     </section>
+    <h4 style="margin: 1rem 0 0.4rem 0; font-size: 0.95rem; font-weight: 600; color: #3d4d60;">
+      Applications API response
+    </h4>
+    <pre class="api-out" id="app-api-out">(none yet)</pre>
+
     <h3 style="margin-top: 1.25rem;">Recent applications</h3>
     <p class="muted" style="margin: 0 0 0.5rem 0;">
-      Change the status dropdown then click <strong>Save</strong> to <code>PATCH /api/applications/{id}</code>.
+      Change status and click <strong>Save</strong> (<code>PATCH /api/applications/{id}</code>) or click <strong>Remove</strong> (<code>DELETE /api/applications/{id}</code>).
     </p>
     {# Status options shared by every row's dropdown. Edit list to suit your pipeline. #}
     {% set _status_options = ['applied', 'in_review', 'phone_screen', 'interview', 'offer', 'rejected', 'withdrawn'] %}
     <table>
       <thead>
         <tr>
-          <th>ID</th><th>Company</th><th>Role</th><th>Applied</th><th>Status</th><th></th>
+          <th>ID</th><th>Company</th><th>Role</th><th>Applied</th><th>Status</th><th>Actions</th>
         </tr>
       </thead>
       <tbody id="apps-tbody">
@@ -617,8 +633,9 @@
               {% endif %}
             </select>
           </td>
-          <td>
+          <td class="td-app-actions">
             <button type="button" class="btn-kb-view" data-save-app-status="{{ a.id }}">Save</button>
+            <button type="button" class="btn-delete-job" data-delete-application="{{ a.id }}" title="Delete this application">Remove</button>
           </td>
         </tr>
         {% else %}
@@ -626,8 +643,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3 style="margin-top: 1rem;">Applications API response</h3>
-    <pre class="api-out" id="app-api-out">(none yet)</pre>
+
     <section class="card" style="margin-bottom: 1rem; margin-top: 1.25rem;">
       <h3>Run scrape</h3>
       <p class="muted" style="margin: 0 0 0.5rem 0;">Presets load from <code>config/scrape_sources.yml</code> (same list as the daily scheduler).</p>
@@ -791,6 +807,90 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    /** Status options for dynamically inserted rows (mirror template `_status_options`). */
+    const APP_STATUS_OPTIONS = [
+      'applied', 'in_review', 'phone_screen', 'interview', 'offer', 'rejected', 'withdrawn',
+    ];
+
+    /** Display dash for empty plain-text cells. */
+    function cellOrDashHtml(val) {
+      const raw = String(val || '').trim();
+      return raw ? escapeHtml(raw) : '&mdash;';
+    }
+
+    /**
+     * Build one applications table row matching server-rendered markup.
+     *
+     * Args:
+     *   applicationId: New row id from ``POST /api/applications/add``.
+     *   fields: Strings from the add form for company, role, date_applied, status.
+     */
+    function buildApplicationRowHtml(applicationId, fields) {
+      const idNum = Number(applicationId);
+      const idStr = escapeHtml(String(idNum));
+      const statusRaw = String(fields.status || '').trim();
+      const statusLow = statusRaw.toLowerCase();
+      let optionsHtml = '<option value="">(none)</option>';
+      for (let i = 0; i < APP_STATUS_OPTIONS.length; i++) {
+        const opt = APP_STATUS_OPTIONS[i];
+        const sel = statusLow === opt ? ' selected' : '';
+        optionsHtml +=
+          '<option value="' +
+          escapeHtml(opt) +
+          '"' +
+          sel +
+          '>' +
+          escapeHtml(opt) +
+          '</option>';
+      }
+      if (
+        statusRaw &&
+        APP_STATUS_OPTIONS.indexOf(statusLow) < 0
+      ) {
+        optionsHtml +=
+          '<option value="' +
+          escapeHtml(statusRaw) +
+          '" selected>' +
+          escapeHtml(statusRaw) +
+          '</option>';
+      }
+      return (
+        '<tr data-app-row="' +
+        idStr +
+        '"><td>' +
+        idStr +
+        '</td><td>' +
+        cellOrDashHtml(fields.company) +
+        '</td><td>' +
+        cellOrDashHtml(fields.role) +
+        '</td><td>' +
+        cellOrDashHtml(fields.date_applied) +
+        '</td><td><select class="app-status-select" data-app-status="' +
+        idStr +
+        '">' +
+        optionsHtml +
+        '</select></td><td class="td-app-actions">' +
+        '<button type="button" class="btn-kb-view" data-save-app-status="' +
+        idStr +
+        '">Save</button>' +
+        '<button type="button" class="btn-delete-job" data-delete-application="' +
+        idStr +
+        '" title="Delete this application">Remove</button></td></tr>'
+      );
+    }
+
+    /** Insert newest application row at top of `#apps-tbody`, matching ``ORDER BY id DESC``."""
+    function insertApplicationsRowFresh(applicationId, fields) {
+      const tbody = document.getElementById('apps-tbody');
+      if (!tbody) return;
+      const stub = tbody.querySelector('td[colspan="6"]');
+      if (stub && stub.closest('tr')) stub.closest('tr').remove();
+      tbody.insertAdjacentHTML(
+        'afterbegin',
+        buildApplicationRowHtml(applicationId, fields)
+      );
     }
 
     /**
@@ -1105,20 +1205,44 @@
       }, opsApiOut);
     });
 
-    document.getElementById('form-app').addEventListener('submit', (e) => {
+    document.getElementById('form-app').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const t = e.target;
+      const form = e.target;
       const body = {
-        company: t.company.value,
-        role: t.role.value,
-        link: t.link.value,
-        date_applied: t.date_applied.value,
-        status: t.status.value || null,
-        cv_version: t.cv_version.value || null,
-        cover_version: t.cover_version.value || null,
-        notes: t.notes.value || null,
+        company: form.company.value,
+        role: form.role.value,
+        link: form.link.value,
+        date_applied: form.date_applied.value,
+        status: form.status.value || null,
+        cv_version: form.cv_version.value || null,
+        cover_version: form.cover_version.value || null,
+        notes: form.notes.value || null,
       };
-      postJson('/api/applications/add', body, appApiOut);
+      try {
+        const res = await fetch('/api/applications/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const txt = await res.text();
+        showResponse(appApiOut, formatResponse(res, txt));
+        if (!res.ok) return;
+        let parsed = null;
+        try {
+          parsed = JSON.parse(txt);
+        } catch (parseErr) { /* ignored */ }
+        const newId =
+          parsed && typeof parsed.id === 'number'
+            ? parsed.id
+            : parsed && parsed.id != null && !Number.isNaN(Number(parsed.id))
+              ? Number(parsed.id)
+              : null;
+        if (newId != null) {
+          insertApplicationsRowFresh(newId, body);
+        }
+      } catch (err) {
+        showResponse(appApiOut, String(err));
+      }
     });
 
     document.getElementById('form-pdf-cv').addEventListener('submit', (e) => {
@@ -1160,7 +1284,7 @@
         try {
           const res = await fetch('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
           const txt = await res.text();
-          showResponse(appApiOut, formatResponse(res, txt));
+          showResponse(opsApiOut, formatResponse(res, txt));
           if (res.ok) {
             const row = btn.closest('tr');
             if (row) row.remove();
@@ -1171,7 +1295,7 @@
             }
           }
         } catch (err) {
-          showResponse(appApiOut, 'Delete failed: ' + String(err));
+          showResponse(opsApiOut, 'Delete failed: ' + String(err));
         }
       });
     }
@@ -1179,6 +1303,29 @@
     const appsTbody = document.getElementById('apps-tbody');
     if (appsTbody) {
       appsTbody.addEventListener('click', async (e) => {
+        const delBtn = e.target.closest('[data-delete-application]');
+        if (delBtn) {
+          const id = delBtn.getAttribute('data-delete-application');
+          if (!id || !window.confirm('Delete application #' + id + '? This cannot be undone.')) return;
+          try {
+            const res = await fetch('/api/applications/' + encodeURIComponent(id), { method: 'DELETE' });
+            const txt = await res.text();
+            showResponse(appApiOut, formatResponse(res, txt));
+            if (res.ok) {
+              const row = delBtn.closest('tr');
+              if (row) row.remove();
+              if (!appsTbody.querySelector('tr[data-app-row]')) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="6">No applications yet.</td>';
+                appsTbody.appendChild(tr);
+              }
+            }
+          } catch (err) {
+            showResponse(appApiOut, 'Delete failed: ' + String(err));
+          }
+          return;
+        }
+
         const btn = e.target.closest('[data-save-app-status]');
         if (!btn) return;
         const id = btn.getAttribute('data-save-app-status');

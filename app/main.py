@@ -893,6 +893,14 @@ async def api_applications_update(
     return JSONResponse({"ok": True, "id": application_id, "application": row})
 
 
+@app.delete("/api/applications/{application_id}")
+async def api_applications_delete(application_id: int) -> JSONResponse:
+    """Delete one application row by id."""
+    if not storage.application_delete(application_id):
+        raise HTTPException(status_code=404, detail="application not found")
+    return JSONResponse({"ok": True, "id": application_id})
+
+
 @app.delete("/api/jobs/{job_id}")
 async def api_jobs_delete(job_id: int) -> JSONResponse:
     """Delete one job listing row by id (scraped jobs board)."""

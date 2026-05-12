@@ -9,7 +9,7 @@ linkedin.com/in/itish-singh-09853733 · https://github.com/itsitish
 
 ## Career summary
 
-- Full-stack data scientist with 5+ years building and deploying ML systems end-to-end in Python, PySpark, and SQL on AWS. Shipped RNN forecasters, signal decomposition pipelines, and serverless inference architectures serving 60,000+ households Skilled in the entire lifecyle from feature engineering and distributed data processing to SageMaker training, deployment, and production monitoring.
+- Full-stack data scientist with 6+ years building and deploying ML systems end-to-end in Python, PySpark, and SQL on AWS. Shipped RNN forecasters, signal decomposition pipelines, and serverless inference architectures serving 60,000+ households Skilled in the entire lifecyle from feature engineering and distributed data processing to SageMaker training, deployment, and production monitoring.
 
 
 ## Education
@@ -23,7 +23,7 @@ Focus: Python, SQL, MongoDB, Data Structures
 
 ## Skills
 
-- Agentic AI & LLMs: GPT Agents, RAG, Vector Databases, Prompt Engineering, CursorAI, Claude API, OpenClaw, HuggingFace
+- Agentic AI & LLMs: GPT Agents, RAG, Vector Databases, Prompt Engineering, CursorAI, Claude API, OpenClaw, HuggingFace, OpenAI API, pgvector, langchain
 - Data Science & ML: Gradient Boosting, Regression, Forecasting, Clustering, Deep Learning (RNNs, CNNs), Hypothesis Testing, A/B Testing
 - Programming & Tools: Python (PyTorch, pandas, scikit-learn, FastAPI), SQL, Git, Jira, Scrum/Kanban, Unit Testing, CI/CD
 - Distributed Processing: PySpark, AWS Glue, Lambdas
@@ -39,9 +39,10 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Built a PyTorch LSTM forecasting system for UK energy demand — pretrained across thousands of households then fine-tuned per home type — achieving a 20% MAPE reduction; deployed on SageMaker with drift-monitored retraining via distributed computing
 - Developed and evaluated gradient boosting ensemble models for user clustering, improving user feedback scores by 20%
 - Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law
-- Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights
+- Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
 - Architected PySpark pipelines on AWS Glue to produce analytics-ready datasets for multiple ML applications; built aggregation jobs feeding TimescaleDB hypertables for downstream training and inference
 - Distributed a Python-packaged linear regression model across large-scale half-hourly smart meter streams using PySpark on AWS Glue, processing ~350M+ interval records for scheduled batch inference at scale
+- Integrated and configured Model Context Protocol (MCP) workflows between Notion and CursorAI, enabling AI-assisted concurrent documentation updates, delivery tracking, and cross-tool context synchronization
 - Designed a real-time mould-risk detection system using high-performance SQL materialised views and validated thresholds to flag at-risk properties
 - Wrote complex SQL queries to aggregate, validate, and transform smart meter data across multiple source systems, underpinning model training and compliance workflows
 - Achieved a 99% reduction in infrastructure costs and 8x improvement in inference latency by re-architecting a monolithic NILM server into a three-stage serverless pipeline (extraction to inference to persistence), each stage an independent AWS Lambda with parallel, independently scalable execution
@@ -60,6 +61,7 @@ Founding engineer for a consumer IoT startup bringing budget smart-lighting auto
 - Researched and implemented signal-based music visualisation models using audio volume and frequency bands as real-time features
 - Built event-driven data pipelines capturing app interaction and IoT device telemetry to enable experimentation and product iteration
 - Designed and developed a cross-platform mobile application in React Native for BLE/IoT device control and automation
+- Designed and maintained CI/CD pipelines using GitHub Actions to automate testing, version control workflows, and deployment processes across environments
 
 ### Software Developer, Wipro Technologies, Jul 2019 - Jul 2021, Hyderabad, India
 
@@ -69,6 +71,7 @@ Data and software engineer embedded in the British Petroleum account, delivering
 - Built Python data pipelines aggregating smart meter and charging data from hybrid cloud sources into S3, improving reliability for downstream modelling workflows
 - Migrated manual Excel-based analysis to reproducible Python notebooks, improving scalability and auditability
 - Contributed to hybrid mobile and web applications built in Angular and Ionic
+- Deployed serveral internal tooling features in Python as cloud functions in Azure 
 - Delivered analytical findings to stakeholders via Tableau dashboards
 
 

@@ -44,6 +44,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Default scrape URL list for dashboard presets (same file as daily scheduler).
 _SCRAPE_SOURCES_PATH = _PROJECT_ROOT / "config" / "scrape_sources.yml"
 
+# Dashboard: show Job Description Analysis tab/panel when True (HTML + tab JS). APIs are always registered.
+JOB_ANALYSIS_SECTION_VISIBLE = False
+
 # Repo-relative paths for Cursor ``@`` hints (under ``_PROJECT_ROOT``).
 _MASTER_PROFILE_RELATIVE = "config/master_profile.md"
 _KB_DIGEST_RELATIVE = "config/kb_digest.md"
@@ -479,6 +482,7 @@ async def dashboard(request: Request) -> Any:
             "config_target_roles": settings.target_roles,
             "config_min_salary_gbp": settings.min_salary_gbp,
             "scrape_source_urls": scrape_source_urls,
+            "job_analysis_section_visible": JOB_ANALYSIS_SECTION_VISIBLE,
         },
     )
 

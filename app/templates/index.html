@@ -108,6 +108,10 @@
       border-color: #9eb8d4;
       font-weight: 600;
     }
+    /** Ensure flex mobile nav cannot show Job Analysis when ``hidden`` (attribute + Jinja). */
+    .side-nav-item[hidden] {
+      display: none !important;
+    }
     .scroll-top-btn {
       position: fixed;
       right: 1.1rem;
@@ -367,8 +371,9 @@
     <nav id="side-nav" class="side-nav" aria-label="Dashboard sections">
       <p class="side-nav-brand">Career Ops</p>
       <p class="side-nav-muted">Sections</p>
-      <button type="button" class="side-nav-item is-active" data-section="section-job-analysis">Job description analysis</button>
-      <button type="button" class="side-nav-item" data-section="section-cv-cover">CV &amp; cover output</button>
+      <!-- Job description analysis: set JOB_ANALYSIS_SECTION_VISIBLE in app/main.py to restore this tab. -->
+      <button type="button" class="side-nav-item{% if job_analysis_section_visible %} is-active{% endif %}" data-section="section-job-analysis"{% if not job_analysis_section_visible %} hidden{% endif %}>Job description analysis</button>
+      <button type="button" class="side-nav-item{% if not job_analysis_section_visible %} is-active{% endif %}" data-section="section-cv-cover">CV &amp; cover output</button>
       <button type="button" class="side-nav-item" data-section="section-knowledge-base">Knowledge base</button>
       <button type="button" class="side-nav-item" data-section="section-operations">Operations &amp; monitoring</button>
     </nav>
@@ -464,7 +469,7 @@
   </div>
 
   <!-- 2) Job Description Analysis -->
-  <div class="page-section" id="section-job-analysis">
+  <div class="page-section" id="section-job-analysis"{% if not job_analysis_section_visible %} hidden{% endif %}>
     <h2>Job Description Analysis</h2>
     <p class="section-help">Generate a paste-ready tailor prompt from the JD. Default: assume you already <code>@</code> <code>config/master_profile.md</code> and <code>config/kb_digest.md</code> in Cursor so the prompt omits those bodies (JD + evidence table stay full).</p>
     <div class="grid">
@@ -501,7 +506,7 @@
   </div>
 
   <!-- 3) CV & Cover Output -->
-  <div class="page-section" id="section-cv-cover" hidden>
+  <div class="page-section" id="section-cv-cover"{% if job_analysis_section_visible %} hidden{% endif %}>
     <h2>CV &amp; Cover Output</h2>
     <p class="section-help">Paste Cursor chat JSON output below to generate final CV and cover markdown in this app.</p>
     <section class="card" style="margin-bottom: 1rem;">
@@ -686,6 +691,9 @@
   <button type="button" class="scroll-top-btn" id="scroll-top-btn" title="Back to top" hidden aria-label="Back to top">^</button>
 
   <script>
+    /** Mirrors ``JOB_ANALYSIS_SECTION_VISIBLE`` in ``app/main.py`` (server renders initial ``hidden`` / nav state). */
+    const JOB_ANALYSIS_SECTION_VISIBLE = {{ job_analysis_section_visible | tojson }};
+
     const kbApiOut = document.getElementById('kb-api-out');
     const jobApiOut = document.getElementById('job-api-out');
     const cvApiOut = document.getElementById('cv-api-out');
@@ -737,6 +745,14 @@
 
       const panels = panelsRoot.querySelectorAll('.page-section');
       const buttons = nav.querySelectorAll('.side-nav-item[data-section]');
+      const defaultSection = JOB_ANALYSIS_SECTION_VISIBLE ? 'section-job-analysis' : 'section-cv-cover';
+
+      /** True if ``id`` matches a visible nav button (hidden Job Analysis excluded when feature off). */
+      function isNavigableSectionId(id) {
+        return Array.from(buttons).some(
+          (b) => !b.hidden && b.getAttribute('data-section') === id
+        );
+      }
 
       function show(sectionId) {
         panels.forEach((p) => {
@@ -756,14 +772,11 @@
 
       window.addEventListener('hashchange', () => {
         const id = (location.hash || '').replace(/^#/, '');
-        if (Array.from(buttons).some((b) => b.getAttribute('data-section') === id)) {
-          show(id);
-        }
+        if (isNavigableSectionId(id)) show(id);
       });
 
       const hash = (location.hash || '').replace(/^#/, '');
-      const valid = Array.from(buttons).some((b) => b.getAttribute('data-section') === hash);
-      show(valid ? hash : 'section-job-analysis');
+      show(isNavigableSectionId(hash) ? hash : defaultSection);
     }
 
     reorderSections();

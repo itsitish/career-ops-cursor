@@ -2,7 +2,7 @@
   Master CV / profile source. Curate bullets here; used as the canonical narrative
   for tailoring and applications.
 -->
-ITISH SINGH
+Itish Singh
 Data Scientist | MLOps| AWS | AI/ML
 Leeds · 07920 842809 · itishsingh96@gmail.com
 linkedin.com/in/itish-singh-09853733 · https://github.com/itsitish
@@ -40,6 +40,7 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Developed and evaluated gradient boosting ensemble models for user clustering, improving user feedback scores by 20%
 - Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law
 - Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
+- Built NLP pipelines to analyse unstructured enterprise data from Confluence documentation, PDFs, and distributed README files, generating structured insights and comprehensive analysis for product cataloguing
 - Architected PySpark pipelines on AWS Glue to produce analytics-ready datasets for multiple ML applications; built aggregation jobs feeding TimescaleDB hypertables for downstream training and inference
 - Distributed a Python-packaged linear regression model across large-scale half-hourly smart meter streams using PySpark on AWS Glue, processing ~350M+ interval records for scheduled batch inference at scale
 - Integrated and configured Model Context Protocol (MCP) workflows between Notion and CursorAI, enabling AI-assisted concurrent documentation updates, delivery tracking, and cross-tool context synchronization

@@ -38,7 +38,7 @@ Focus: Python, SQL, MongoDB, Data Structures
 Full-stack data scientist owning the complete lifecycle — data pipelines, feature engineering, model research, productionisation, API/microservice deployment, and monitoring — across a smart energy platform serving 60,000+ households.
 - Built a PyTorch LSTM forecasting system for UK energy demand — pretrained across thousands of households then fine-tuned per home type — achieving a 20% MAPE reduction; deployed on SageMaker with drift-monitored retraining via distributed computing
 - Developed and evaluated gradient boosting ensemble models for user clustering, improving user feedback scores by 20%
-- Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law
+- Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law for external customers
 - Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
 - Built NLP pipelines to analyse unstructured enterprise data from Confluence documentation, PDFs, and distributed README files, generating structured insights and comprehensive analysis for product cataloguing
 - Architected PySpark pipelines on AWS Glue to produce analytics-ready datasets for multiple ML applications; built aggregation jobs feeding TimescaleDB hypertables for downstream training and inference
@@ -48,6 +48,7 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Wrote complex SQL queries to aggregate, validate, and transform smart meter data across multiple source systems, underpinning model training and compliance workflows
 - Achieved a 99% reduction in infrastructure costs and 8x improvement in inference latency by re-architecting a monolithic NILM server into a three-stage serverless pipeline (extraction to inference to persistence), each stage an independent AWS Lambda with parallel, independently scalable execution
 - Owned end-to-end delivery of the Home Energy Management System — optimisation models, scheduling APIs, and automated heat pump & EV charge controls — reducing user energy costs by 15%
+- Designed a reinforcement learning scheduling agent using SAC to optimise EV and heat pump controls against dynamic energy tariffs, framing the problem as an MDP with cost minimisation reward and comfort constraints, reducing user energy costs by 15%
 - Deployed Dockerised models to AWS via Terraform (IaC), enabling reproducible releases and simplified auto-scaling
 - Built and deployed event-driven microservices integrating SQS, Kinesis, DynamoDB, Lambda, and API Gateway
 - Modernised ML delivery with CI/CD pipelines and automated code quality standards, reducing production regressions
@@ -64,9 +65,9 @@ Founding engineer for a consumer IoT startup bringing budget smart-lighting auto
 - Designed and developed a cross-platform mobile application in React Native for BLE/IoT device control and automation
 - Designed and maintained CI/CD pipelines using GitHub Actions to automate testing, version control workflows, and deployment processes across environments
 
-### Software Developer, Wipro Technologies, Jul 2019 - Jul 2021, Hyderabad, India
+### Data Analyst, Wipro Technologies, Jul 2019 - Jul 2021, Hyderabad, India
 
-Data and software engineer embedded in the British Petroleum account, delivering across energy management, trading, and EV charging applications — spanning analytics, pipeline development, and full-stack application work.
+Data analyst embedded in the British Petroleum account, delivering across energy management, trading, and EV charging applications — spanning data analytics, ETL pipeline development and dashboarding
 - Analysed energy consumption and EV charging data to surface usage patterns, peak demand windows, and load-shifting opportunities
 - Wrote complex SQL queries to aggregate and validate meter and charging data across multiple source systems, supporting downstream modelling and reporting
 - Built Python data pipelines aggregating smart meter and charging data from hybrid cloud sources into S3, improving reliability for downstream modelling workflows

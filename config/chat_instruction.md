@@ -16,18 +16,21 @@
 - No line spacing between Core Skills entries — tight block with no blank lines between them
 - All numbers and metrics must be bold — e.g. **99%**, **8x**, **350M+**, **60,000+**, **20%**
 - No mid-word line breaks — each bullet/paragraph must be one continuous string in the JSON
+- Bold short JD-aligned keywords within bullets only, never whole bullets
+- Closing ** sits immediately before punctuation: **SageMaker**, not **SageMaker** ,
+
 
 **Summary / headline**
 - Fully rewrite the summary for every JD from scratch — no carried-over stock phrases
 - Shape both headline and summary entirely from the specific JD language
 
 **Experience bullets — per role rules**
-- Chameleon: rewrite every bullet to match JD wording, reorder by JD relevance.  but drop any bullet with genuinely zero relevance to the specific JD. 
+- Chameleon: rewrite every bullet, reorder by JD relevance, drop zero-relevance bullets with reason
 - TripSync: keep all bullets, rewrite every one to match JD wording, reorder by JD relevance.  
 - Wipro: rewrite all bullets to match JD wording, but drop any with genuinely zero relevance to the specific JD. 
 
 **Spelling and style**
-- British English for UK JDs (organise, colour, centre)
+- British English always
 - Standard Markdown only — no Unicode arrows or non-Markdown symbols
 - Education: plain text, no `*italics*` around Focus or module names
 - `**bold**` used deliberately for Core Skills labels and short JD-aligned keywords only — never whole bullets or paragraphs
@@ -44,3 +47,4 @@
 - Read `@config/master_profile.md` and `@config/kb_digest.md` at the start of each session if they are not already in context
 - Never fabricate employers, dates, metrics, degrees, certifications, or tools
 - If the user states a fact verbally (e.g. "I used OpenAI API"), flag that it needs adding to master_profile.md before using it — do not add it silently
+- Keep the CV maximum 2 pages long

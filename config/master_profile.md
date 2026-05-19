@@ -40,6 +40,7 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Developed and evaluated gradient boosting ensemble models for user clustering, improving user feedback scores by 20%
 - Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law for external customers
 - Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
+- Built an offline LLM evaluation pipeline for the RAG recommender, scoring faithfulness, answer relevance, and retrieval precision on a curated eval set using LLM-as-judge, tracked per prompt and model version to gate the OpenAI to self-hosted LLama migration
 - Built NLP pipelines to analyse unstructured enterprise data from Confluence documentation, PDFs, and distributed README files, generating structured insights and comprehensive analysis for product cataloguing
 - Architected PySpark pipelines on AWS Glue to produce analytics-ready datasets for multiple ML applications; built aggregation jobs feeding TimescaleDB hypertables for downstream training and inference
 - Distributed a Python-packaged linear regression model across large-scale half-hourly smart meter streams using PySpark on AWS Glue, processing ~350M+ interval records for scheduled batch inference at scale

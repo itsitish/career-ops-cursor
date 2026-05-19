@@ -17,12 +17,13 @@
 - All numbers and metrics must be bold — e.g. **99%**, **8x**, **350M+**, **60,000+**, **20%**
 - No mid-word line breaks — each bullet/paragraph must be one continuous string in the JSON
 - Bold short JD-aligned keywords within bullets only, never whole bullets
-- Closing ** sits immediately before punctuation: **SageMaker**, not **SageMaker** ,
-
+- Closing ** wraps punctuation: **SageMaker,**, not **SageMaker** ,
+- Contact line — single line, no linebreak: Leeds · 07920 842809 · itishsingh96@gmail.com · linkedin.com/in/itish-singh-09853733 · github.com/itsitish
 
 **Summary / headline**
 - Fully rewrite the summary for every JD from scratch — no carried-over stock phrases
 - Shape both headline and summary entirely from the specific JD language
+- no ## Summary heading, just the paragraph directly
 
 **Experience bullets — per role rules**
 - Chameleon: rewrite every bullet, reorder by JD relevance, drop zero-relevance bullets with reason

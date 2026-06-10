@@ -27,7 +27,7 @@ Focus: Python, SQL, MongoDB, Data Structures
 - Data Science & ML: Gradient Boosting, Regression, Forecasting, Clustering, Deep Learning (RNNs, CNNs), Hypothesis Testing, A/B Testing
 - Programming & Tools: Python (PyTorch, pandas, scikit-learn, FastAPI), SQL, Git, Jira, Scrum/Kanban, Unit Testing, CI/CD
 - Distributed Processing: PySpark, AWS Glue, Lambdas
-- Data Platforms: PostgreSQL, DynamoDB, Athena, RDS, Aurora, S3 Data Lake
+- Data Platforms: PostgreSQL, DynamoDB, Athena, RDS, Aurora, S3 Data Lake, Parquet
 - Cloud Infrastructure: AWS, Terraform, Docker, Quicksight (Model Monitoring, BI Dashboards), Serverless Architecture
 - Collaboration: Cross-functional Team Leadership, Scrum Master, Stakeholder Management, Roadmap Definition
 
@@ -36,8 +36,9 @@ Focus: Python, SQL, MongoDB, Data Structures
 ### Data Scientist, Chameleon Technology, Dec 2022 - Present, Harrogate, England
 
 Full-stack data scientist owning the complete lifecycle — data pipelines, feature engineering, model research, productionisation, API/microservice deployment, and monitoring — across a smart energy platform serving 60,000+ households.
-- Built a PyTorch LSTM forecasting system for UK energy demand — pretrained across thousands of households then fine-tuned per home type — achieving a 20% MAPE reduction; deployed on SageMaker with drift-monitored retraining via distributed computing
-- Developed and evaluated gradient boosting ensemble models for user clustering, improving user feedback scores by 20%
+- Built a PyTorch LSTM forecasting system for UK energy demand — pretrained across thousands of households then fine-tuned per home type, achieving a 20% MAPE reduction; deployed on SageMaker with drift-monitored retraining via distributed computing
+- Fine tuned clustering algorithms by performing A/B testing and improving user feedback scores by 15%
+- Developed and evaluated gradient boosting ensemble models for user clustering, improving marketing campaign engagement metrics by 10%
 - Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law for external customers
 - Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
 - Built an offline LLM evaluation pipeline for the RAG recommender, scoring faithfulness, answer relevance, and retrieval precision on a curated eval set using LLM-as-judge, tracked per prompt and model version to gate the OpenAI to self-hosted LLama migration
@@ -87,6 +88,8 @@ Data analyst embedded in the British Petroleum account, delivering across energy
 - Agentic Market Research Pipeline: Used OpenClaw and HuggingFace to orchestrate multi-agent workflows, scraping and summarising stock market blog posts into structured insights — demonstrating hands-on agentic AI capability applied to unstructured financial content.
 
 - Self-hosted Job-Search Platform (FastAPI): Built a Python/FastAPI app with SQLite and worker-backed background tasks, wrapping a human-in-the-loop Cursor + GPT layer for prompt and document work focused on tracking and consistency.
+
+- 
 
 
 ## Achievements

@@ -5,9 +5,11 @@
 - JSON shape for CV only: `{"tailored_cv_markdown": "..."}`
 - JSON shape for CV and cover letter: `{"tailored_cv_markdown": "...", "tailored_cover_markdown": "..."}`
 - Output the JSON first, then the change log and gaps after it
+- Change log will be short bullets — only dropped bullets with reason and honest gaps. No itemising every rewrite.
 - Never add prose commentary before or after the JSON block
 
 **CV structure**
+- Name should always be a heading with `#`
 - Headline goes as a `##` heading directly under the name, never wrapped in `**bold**`
   - Example: `## AI Engineer | LLMs, Agentic AI & Production GenAI Systems`
 - No `---` horizontal rules between sections — use `##` / `###` headings and blank lines only
@@ -29,6 +31,7 @@
 - Chameleon: rewrite every bullet, reorder by JD relevance, drop zero-relevance bullets with reason
 - TripSync: keep all bullets, rewrite every one to match JD wording, reorder by JD relevance.  
 - Wipro: rewrite all bullets to match JD wording, but drop any with genuinely zero relevance to the specific JD. 
+- All - Do not use same starting words all bullets like `Built`, come up with new words
 
 **Spelling and style**
 - British English always
@@ -43,6 +46,7 @@
 - Call out every honest gap where the JD asks for something not in the materials
 
 **General behaviour**
+- Switch to Ask mode
 - Never ask to switch to Agent mode
 - Keep answers short and compressed
 - Read `@config/master_profile.md` and `@config/kb_digest.md` at the start of each session if they are not already in context

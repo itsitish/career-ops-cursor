@@ -23,7 +23,7 @@ Focus: Python, SQL, MongoDB, Data Structures
 
 ## Skills
 
-- Agentic AI & LLMs: GPT Agents, RAG, Vector Databases, Prompt Engineering, CursorAI, Claude API, OpenClaw, HuggingFace, OpenAI API, pgvector, langchain
+- Agentic AI & LLMs: GPT Agents, RAG, Vector Databases, Prompt Engineering, CursorAI, LangGraph, LangSmith, OpenAI API, pgvector, langchain, OpenClaw, HuggingFace
 - Data Science & ML: Gradient Boosting, Regression, Forecasting, Clustering, Deep Learning (RNNs, CNNs), Hypothesis Testing, A/B Testing
 - Programming & Tools: Python (PyTorch, pandas, scikit-learn, FastAPI), SQL, Git, Jira, Scrum/Kanban, Unit Testing, CI/CD
 - Distributed Processing: PySpark, AWS Glue, Lambdas
@@ -40,9 +40,10 @@ Full-stack data scientist owning the complete lifecycle — data pipelines, feat
 - Fine tuned clustering algorithms by performing A/B testing and improving user feedback scores by 15%
 - Developed and evaluated gradient boosting ensemble models for user clustering, improving marketing campaign engagement metrics by 10%
 - Researched mould-risk conditions from humidity and temperature sensor data; hypothesised and validated statistical alert thresholds; deployed a SageMaker-based compliance solution under Awaab's Law for external customers
-- Developed an LLM-powered recommendation framework using RAG and vector embeddings to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
-- Built an offline LLM evaluation pipeline for the RAG recommender, scoring faithfulness, answer relevance, and retrieval precision on a curated eval set using LLM-as-judge, tracked per prompt and model version to gate the OpenAI to self-hosted LLama migration
-- Built NLP pipelines to analyse unstructured enterprise data from Confluence documentation, PDFs, and distributed README files, generating structured insights and comprehensive analysis for product cataloguing
+- Developed an LLM-powered recommendation framework using LangGraph and vector pgvector to surface personalised user-facing energy insights, leveraging OpenAI API, pgvector, langchain. Currently migrating to a self hosted LLama model for generaive layer
+- Built an LangSmith LLM evaluation pipeline for the RAG recommender, scoring faithfulness, answer relevance, and retrieval precision on a curated eval set using LLM-as-judge, tracked per prompt and model version to gate the OpenAI to self-hosted LLama migration
+- Built RAG pipelines to analyse unstructured enterprise data from Confluence, Notion and Research Papers, generating structured insights and summaries for R&D and product prototyping
+- 
 - Architected PySpark pipelines on AWS Glue to produce analytics-ready datasets for multiple ML applications; built aggregation jobs feeding TimescaleDB hypertables for downstream training and inference
 - Distributed a Python-packaged linear regression model across large-scale half-hourly smart meter streams using PySpark on AWS Glue, processing ~350M+ interval records for scheduled batch inference at scale
 - Integrated and configured Model Context Protocol (MCP) workflows between Notion and CursorAI, enabling AI-assisted concurrent documentation updates, delivery tracking, and cross-tool context synchronization
@@ -89,8 +90,7 @@ Data analyst embedded in the British Petroleum account, delivering across energy
 
 - Self-hosted Job-Search Platform (FastAPI): Built a Python/FastAPI app with SQLite and worker-backed background tasks, wrapping a human-in-the-loop Cursor + GPT layer for prompt and document work focused on tracking and consistency.
 
-- 
-
+- Agentic Enterprise Assistant: Built an end-to-end Docker prototype where a LangGraph agent answers operational customer queries via dynamic MCP tool calling against PostgreSQL, with Keycloak RBAC, Redis session memory, a reusable escalation skill, LangSmith tracing, and an extensive HITL eval harness 
 
 ## Achievements
 
